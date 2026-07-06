@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-arango
+twstock
+httpx
+pydantic-settings
+python-dotenv
+lxml
+duckdb
+pyarrow
+boto3
+yfinance
+apscheduler

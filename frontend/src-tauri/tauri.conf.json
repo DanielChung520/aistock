@@ -1,0 +1,44 @@
+{
+  "build": {
+    "distDir": "http://localhost:3300",
+    "devPath": "http://localhost:3300",
+    "beforeDevCommand": "",
+    "beforeBuildCommand": ""
+  },
+  "package": {
+    "productName": "aiStock",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "bundle": {
+      "active": true,
+      "targets": "all",
+      "identifier": "com.aistock.app",
+      "icon": []
+    },
+    "security": {
+      "csp": null,
+      "dangerousRemoteDomainIpcAccess": [
+        {
+          "domain": "localhost",
+          "enableTauriAPI": true,
+          "windows": ["main"]
+        }
+      ]
+    },
+    "windows": [
+      {
+        "title": "aiStock - 台股分析平台",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false,
+        "center": true
+      }
+    ]
+  }
+}

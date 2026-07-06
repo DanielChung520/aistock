@@ -1,0 +1,16 @@
+services:
+  arangodb:
+    image: arangodb:3.12
+    container_name: aistock-arangodb
+    ports:
+      - '8530:8529'
+    environment:
+      ARANGO_ROOT_PASSWORD: aistock2024
+    volumes:
+      - arangodb_data:/var/lib/arangodb3
+      - arangodb_apps:/var/lib/arangodb3-apps
+    restart: unless-stopped
+
+volumes:
+  arangodb_data:
+  arangodb_apps:

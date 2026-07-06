@@ -1,0 +1,19 @@
+[project]
+name = "aistock-backend"
+version = "0.1.0"
+description = "FastAPI backend service for aiStock"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "python-arango",
+  "twstock",
+  "httpx",
+  "pydantic-settings",
+  "python-dotenv",
+  "lxml",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"

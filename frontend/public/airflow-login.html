@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>登入中...</title>
+</head>
+<body>
+  <form id="loginForm" action="http://airflow.k84.org/login" method="POST">
+    <input type="hidden" name="username" value="admin">
+    <input type="hidden" name="password" value="admin">
+    <input type="hidden" name="csrf_token" id="csrf_token" value="">
+    <input type="hidden" name="remember_me" value="true">
+  </form>
+  <script>
+    async function login() {
+      try {
+        const res = await fetch('http://airflow.k84.org/login');
+        const html = await res.text();
+        const match = html.match(/name="csrf_token" value="([^"]+)"/);
+        if (match) {
+          document.getElementById('csrf_token').value = match[1];
+          document.getElementById('loginForm').submit();
+        } else {
+          window.location.href = 'http://airflow.k84.org/home';
+        }
+      } catch(e) {
+        window.location.href = 'http://airflow.k84.org/home';
+      }
+    }
+    login();
+  </script>
+</body>
+</html>
