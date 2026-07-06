@@ -39,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Pre-flight config validation
-        run: bash scripts/validate-tauri-config.sh
+        run: bash ../scripts/validate-tauri-config.sh
       - uses: pnpm/action-setup@v4
         with:
           version: 9
