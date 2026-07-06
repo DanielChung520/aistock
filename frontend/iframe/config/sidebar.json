@@ -1,0 +1,63 @@
+{
+  "items": [
+    {
+      "id": "home",
+      "title": "首頁",
+      "icon": "Home",
+      "route": "/",
+      "behavior": "switch"
+    },
+    {
+      "id": "dashboard",
+      "title": "台股儀表板",
+      "icon": "LayoutDashboard",
+      "route": "/",
+      "behavior": "switch",
+      "tooltip": "台股大盤儀表板"
+    },
+    {
+      "id": "watchlist",
+      "title": "我的股票",
+      "icon": "Briefcase",
+      "route": "/watchlist",
+      "behavior": "drawer-right",
+      "tooltip": "從右側抽屜開啟"
+    },
+    {
+      "id": "news",
+      "title": "今日消息",
+      "icon": "Newspaper",
+      "route": "/news",
+      "behavior": "newTab"
+    },
+    {
+      "id": "basics",
+      "title": "基本資料",
+      "icon": "Database",
+      "route": "/basics",
+      "behavior": "newTab"
+    },
+    {
+      "id": "auction",
+      "title": "盤後資訊",
+      "icon": "Tag",
+      "route": "/auction",
+      "behavior": "newTab"
+    },
+    {
+      "id": "airflow",
+      "title": "資料流程",
+      "icon": "Workflow",
+      "route": "/airflow",
+      "behavior": "newTab"
+    },
+    {
+      "id": "ai-assistant",
+      "title": "AI 助手",
+      "icon": "Bot",
+      "route": "ai-assistant",
+      "behavior": "modal",
+      "tooltip": "AI 助手聊天"
+    }
+  ]
+}
