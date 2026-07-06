@@ -1,7 +1,7 @@
 use log::info;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use tauri::{Manager, WebviewWindow};
+use tauri::Manager;
 
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -11,11 +11,23 @@ pub fn run() {
     let project_root = find_project_root(&exe_path);
     info!("Project root: {:?}", project_root);
 
-    let backend_handle = spawn_backend(&project_root);
-    info!("FastAPI spawned (PID: {})", backend_handle.id());
+    // Detect development mode: project source tree exists next to the binary
+    let is_dev = project_root.join("backend").join("src").join("main.py").exists();
+    info!("Running in {} mode", if is_dev { "development" } else { "production" });
 
-    let next_handle = spawn_frontend(&project_root);
-    info!("Next.js server spawned (PID: {})", next_handle.id());
+    if is_dev {
+        // Development mode: spawn FastAPI backend only.
+        // Frontend is started by beforeDevCommand (pnpm run dev).
+        match spawn_backend(&project_root) {
+            Ok(child) => info!("FastAPI spawned (PID: {})", child.id()),
+            Err(e) => log::warn!("Failed to spawn backend: {}", e),
+        }
+    } else {
+        // Production (bundled .app / .dmg) mode:
+        // - Frontend: Tauri serves static files from frontendDist ("../.next")
+        // - Backend: FastAPI must be started separately by the user (not bundled)
+        info!("Production bundle: frontend served from embedded assets, backend unavailable");
+    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -23,7 +35,7 @@ pub fn run() {
         .setup(move |app| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_title("aiStock - 台股分析平台");
-                info!("Window loading Next.js server");
+                info!("Window loaded");
             }
             Ok(())
         })
@@ -39,56 +51,47 @@ fn find_project_root(exe_path: &Path) -> PathBuf {
         }
         current = dir.parent();
     }
-    std::env::current_dir().expect("failed to get current dir")
+    // Fallback: check if CWD has the project structure
+    let cwd = std::env::current_dir().expect("failed to get current dir");
+    if cwd.join("backend").join("src").join("main.py").exists() {
+        return cwd;
+    }
+    cwd
 }
 
-fn spawn_backend(project_root: &Path) -> Child {
+fn spawn_backend(project_root: &Path) -> Result<Child, String> {
     let venv_python = if cfg!(target_os = "windows") {
-        project_root.join("backend").join(".venv").join("Scripts").join("python.exe")
+        project_root
+            .join("backend")
+            .join(".venv")
+            .join("Scripts")
+            .join("python.exe")
     } else {
-        project_root.join("backend").join(".venv").join("bin").join("python")
+        project_root
+            .join("backend")
+            .join(".venv")
+            .join("bin")
+            .join("python")
     };
 
-    Command::new(&venv_python)
-        .arg("-m")
-        .arg("uvicorn")
-        .arg("src.main:app")
-        .arg("--host")
-        .arg("0.0.0.0")
-        .arg("--port")
-        .arg("38000")
-        .current_dir(project_root.join("backend"))
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .unwrap_or_else(|_| {
-            Command::new("python3")
-                .arg("-m")
-                .arg("uvicorn")
-                .arg("src.main:app")
-                .arg("--host")
-                .arg("0.0.0.0")
-                .arg("--port")
-                .arg("38000")
-                .current_dir(project_root.join("backend"))
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .spawn()
-                .expect("failed to spawn backend")
-        })
-}
+    let backend_dir = project_root.join("backend");
 
-fn spawn_frontend(project_root: &Path) -> Child {
-    let next_dir = project_root.join("frontend");
-    let cmd = if cfg!(target_os = "windows") { "npx.cmd" } else { "npx" };
-    Command::new(cmd)
-        .arg("next")
-        .arg("start")
-        .arg("--port")
-        .arg("3300")
-        .current_dir(&next_dir)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("failed to spawn frontend")
+    let run_python = |python: &Path| -> Result<Child, std::io::Error> {
+        Command::new(python)
+            .arg("-m")
+            .arg("uvicorn")
+            .arg("src.main:app")
+            .arg("--host")
+            .arg("0.0.0.0")
+            .arg("--port")
+            .arg("38000")
+            .current_dir(&backend_dir)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+    };
+
+    run_python(&venv_python)
+        .or_else(|_| run_python(Path::new("python3")))
+        .map_err(|e| format!("failed to spawn backend: {}", e))
 }
