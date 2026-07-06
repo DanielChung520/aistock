@@ -18,10 +18,11 @@ export const metadata: Metadata = {
   generator: 'EEA - My AI Stock',
   icons: {
     icon: [
-      { url: '/icon.png', type: 'image/png' },
+      { url: '/favicon-light.png', type: 'image/png', media: '(prefers-color-scheme: light)' },
+      { url: '/favicon-dark.png', type: 'image/png', media: '(prefers-color-scheme: dark)' },
       { url: '/favicon.ico', sizes: 'any' },
     ],
-    apple: '/icon.png',
+    apple: '/favicon-light.png',
   },
 };
 
