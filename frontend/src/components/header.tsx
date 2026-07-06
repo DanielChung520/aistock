@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, Mail, Globe, Moon, Sun, Settings, UserCog, SlidersHorizontal, Wrench, Activity, Menu, Clock } from 'lucide-react';
+import { Bell, Mail, Globe, Moon, Sun, Settings, UserCog, SlidersHorizontal, Wrench, Activity, Menu, Clock, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -15,11 +15,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useTheme } from 'next-themes';
 import { useState, useEffect } from 'react';
-import { userData } from '@/lib/mock-data';
+import { userData } from '@/lib/mock-data'
+import { useUpdateStore } from '@/lib/updater';
 
 export function Header({ onMenuClick, title }: { onMenuClick?: () => void; title?: string }) {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const updateStore = useUpdateStore();
 
   useEffect(() => {
     setMounted(true);
@@ -95,6 +97,16 @@ export function Header({ onMenuClick, title }: { onMenuClick?: () => void; title
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => updateStore.check()}
+                className="flex items-center gap-2 cursor-pointer"
+              >
+                <RefreshCw className={'h-4 w-4 ' + (updateStore.state.phase === 'checking' ? 'animate-spin' : '')} />
+                {updateStore.state.phase === 'checking' ? '檢查中...' : '檢查版本更新'}
+                {updateStore.state.phase === 'available' && (
+                  <span className="ml-auto text-[10px] text-primary font-medium">v{updateStore.state.version}</span>
+                )}
+              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/admin/status" className="flex items-center gap-2 cursor-pointer">
                   <Activity className="h-4 w-4" />

@@ -4,6 +4,7 @@ import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { StockTabProvider } from '@/lib/stock-tab-context';
 import { AIDrawerProvider } from '@/lib/ai-drawer-context';
+import { UpdateNotifier } from '@/components/update-notifier';
 import { MyStocksDrawerProvider } from '@/lib/my-stocks-drawer-context';
 
 export const metadata: Metadata = {
@@ -38,6 +39,7 @@ export default function RootLayout({
             <AIDrawerProvider>
               <MyStocksDrawerProvider>
                 {children}
+                <UpdateNotifier />
               </MyStocksDrawerProvider>
             </AIDrawerProvider>
           </StockTabProvider>
