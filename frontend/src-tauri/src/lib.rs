@@ -1,7 +1,7 @@
 use log::info;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use tauri::WebviewWindow;
+use tauri::{Manager, WebviewWindow};
 
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
