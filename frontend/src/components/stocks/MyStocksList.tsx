@@ -182,7 +182,7 @@ export function MyStocksList({ onSelect }: MyStockListProps = {}) {
               return (
                 <Link
                   key={stock.stock_id}
-                  href={`/stock?symbol=${stock.stock_id}`}
+                  href={`/stock/${stock.stock_id}`}
                   className="flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors"
                 >
                   {content}

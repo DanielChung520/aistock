@@ -134,12 +134,12 @@ export function WatchlistPanel({ className }: WatchlistPanelProps) {
                   return (
                     <TableRow key={stock.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
                       <TableCell>
-                        <Link href={`/stock?symbol=${stock.stock_id}`} className="block w-full">
+                        <Link href={`/stock/${stock.stock_id}`} className="block w-full">
                           {stock.stock_id}
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/stock?symbol=${stock.stock_id}`} className="block w-full">
+                        <Link href={`/stock/${stock.stock_id}`} className="block w-full">
                           {stock.name}
                         </Link>
                       </TableCell>

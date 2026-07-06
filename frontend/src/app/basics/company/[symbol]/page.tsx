@@ -1,7 +1,7 @@
 'use client'
 
-import { Suspense, useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { AppShell } from '@/components/app-shell'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -83,9 +83,9 @@ const FieldRow = ({ label, value, linkUrl, linkType }: { label: string; value?: 
   )
 }
 
-function CompanyBasicInfoContent() {
-  const searchParams = useSearchParams()
-  const symbol = searchParams.get('symbol') ?? ''
+export default function CompanyBasicInfoPage() {
+  const params = useParams()
+  const symbol = params.symbol as string
 
   const [data, setData] = useState<CompanyInfo | null>(null)
   const [loading, setLoading] = useState(true)
@@ -93,10 +93,7 @@ function CompanyBasicInfoContent() {
 
   useEffect(() => {
     async function fetchCompanyInfo() {
-      if (!symbol) {
-        setLoading(false)
-        return
-      }
+      if (!symbol) return
 
       try {
         setLoading(true)
@@ -294,7 +291,7 @@ function CompanyBasicInfoContent() {
                   <FieldRow label="英文通訊地址" value={`${data.english_address_street || ''} ${data.english_address_city || ''}`.trim()} />
                   <FieldRow label="投資人關係聯絡人" value={data.investor_relations_contact} />
                   <FieldRow label="職稱" value={data.investor_relations_title} />
-                  <FieldRow label="電話" value={data.investor_relations_phone} />
+                  <FieldRow label="電話" value={data.investor_relations_phone" />
                   <FieldRow label="電子郵件" value={data.investor_relations_email} linkUrl={data.investor_relations_email} linkType="email" />
                 </div>
               </CardContent>
@@ -303,13 +300,5 @@ function CompanyBasicInfoContent() {
         )}
       </div>
     </AppShell>
-  )
-}
-
-export default function CompanyBasicInfoPage() {
-  return (
-    <Suspense fallback={null}>
-      <CompanyBasicInfoContent />
-    </Suspense>
   )
 }
