@@ -291,7 +291,7 @@ export default function CompanyBasicInfoPage() {
                   <FieldRow label="英文通訊地址" value={`${data.english_address_street || ''} ${data.english_address_city || ''}`.trim()} />
                   <FieldRow label="投資人關係聯絡人" value={data.investor_relations_contact} />
                   <FieldRow label="職稱" value={data.investor_relations_title} />
-                  <FieldRow label="電話" value={data.investor_relations_phone" />
+                  <FieldRow label="電話" value={data.investor_relations_phone} />
                   <FieldRow label="電子郵件" value={data.investor_relations_email} linkUrl={data.investor_relations_email} linkType="email" />
                 </div>
               </CardContent>
