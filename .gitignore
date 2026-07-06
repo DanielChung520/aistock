@@ -32,6 +32,11 @@ Thumbs.db
 # Next.js
 .next/
 out/
+next-env.d.ts
+frontend/next-env.d.ts
+
+# iframe/ symlink to public/iframe (avoids duplicating config files)
+frontend/public/iframe
 
 # Misc
 *.log
