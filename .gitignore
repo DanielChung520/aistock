@@ -37,3 +37,7 @@ out/
 *.log
 .cache/
 .sisyphus/
+
+# Tauri generated icons (sub-folders)
+frontend/src-tauri/icons/android/
+frontend/src-tauri/icons/ios/
