@@ -69,5 +69,96 @@ jobs:
           releaseBody: 'See CHANGELOG.md for details.'
           releaseDraft: true
           prerelease: false
-          includeUpdaterJson: true
           args: --target ${{ matrix.target }} --bundles ${{ matrix.bundle }}
+      - name: Upload sigs
+        uses: actions/upload-artifact@v4
+        with:
+          name: aistock-${{ matrix.os }}-sig
+          path: |
+            frontend/src-tauri/target/release/bundle/**/*.sig
+          if-no-files-found: ignore
+      - name: Upload bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: aistock-${{ matrix.os }}
+          path: |
+            frontend/src-tauri/target/release/bundle/**/*.dmg
+            frontend/src-tauri/target/release/bundle/**/*.msi
+            frontend/src-tauri/target/release/bundle/**/*.AppImage
+            frontend/src-tauri/target/release/bundle/**/*.deb
+            frontend/src-tauri/target/release/bundle/**/*.exe
+          if-no-files-found: ignore
+
+  generate-latest-json:
+    name: Generate latest.json
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download sigs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*-sig'
+          path: sigs
+          merge-multiple: true
+      - name: Download bundles
+        uses: actions/download-artifact@v4
+        with:
+          pattern: 'aistock-*'
+          path: bundles
+          merge-multiple: true
+      - name: Generate latest.json
+        run: |
+          set -e
+          VERSION="${GITHUB_REF_NAME#v}"
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "Building latest.json for version $VERSION"
+
+          # Build platforms JSON
+          python3 << 'PYEOF'
+          import json
+          import os
+          from pathlib import Path
+          from datetime import datetime, timezone
+
+          version = os.environ.get('GITHUB_REF_NAME', '').lstrip('v')
+          pub_date = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+          platform_map = {
+              'darwin-aarch64': ['aarch64.dmg', 'aarch64.app'],
+              'darwin-x86_64': ['x64.dmg', 'x64.app'],
+              'linux-x86_64': ['amd64.AppImage', 'x86_64.AppImage', 'amd64.deb', 'x86_64.deb'],
+              'windows-x86_64': ['x64-setup.exe', 'x64.msi'],
+          }
+
+          sigs = {}
+          sig_dir = Path('sigs')
+          for sig_file in sig_dir.rglob('*.sig'):
+              rel = sig_file.name
+              sigs[rel] = sig_file.read_text().strip()
+
+          platforms = {}
+          for platform, patterns in platform_map.items():
+              for sig_name, sig_content in sigs.items():
+                  if any(p in sig_name for p in patterns):
+                      platforms[platform] = {'signature': sig_content}
+                      print(f"  {platform}: {sig_name}")
+                      break
+
+          result = {
+              'version': version,
+              'notes': f'Release {version}',
+              'pub_date': pub_date,
+              'platforms': platforms,
+          }
+          Path('latest.json').write_text(json.dumps(result, indent=2))
+          print('Generated latest.json')
+          PYEOF
+          cat latest.json
+      - name: Upload latest.json
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          file: latest.json
+          fail_on_unmatched_files: true
+          overwrite: true
