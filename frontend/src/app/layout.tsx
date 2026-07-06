@@ -9,13 +9,20 @@ import { MyStocksDrawerProvider } from '@/lib/my-stocks-drawer-context';
 
 export const metadata: Metadata = {
   title: {
-    default: 'aiStock | 台股分析平台',
-    template: '%s | aiStock',
+    default: 'EEA - My AI Stock | 台股分析平台',
+    template: '%s | EEA - My AI Stock',
   },
-  description: 'aiStock - AI 驅動的台股分析平台',
-  keywords: ['aiStock', '台股', '股票分析', 'K線圖', '技術指標'],
-  authors: [{ name: 'aiStock' }],
-  generator: 'aiStock',
+  description: 'EEA - My AI Stock - AI 驅動的台股分析平台',
+  keywords: ['EEA', 'aiStock', '台股', '股票分析', 'K線圖', '技術指標'],
+  authors: [{ name: 'EEA - My AI Stock' }],
+  generator: 'EEA - My AI Stock',
+  icons: {
+    icon: [
+      { url: '/icon.png', type: 'image/png' },
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+    apple: '/icon.png',
+  },
 };
 
 export default function RootLayout({

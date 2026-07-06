@@ -63,3 +63,4 @@ aiStock_*.exe
 
 # AI tool runtime state
 .omo/
+.placeholder/
