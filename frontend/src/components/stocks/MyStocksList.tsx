@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { Plus, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { useWatchlistModal } from '@/lib/watchlist-modal-context'
 
 interface MyStockListProps {
   onSelect?: (stockId: string, stockName: string) => void
@@ -20,6 +21,7 @@ interface MyStockItem {
 }
 
 export function MyStocksList({ onSelect }: MyStockListProps = {}) {
+  const { open: openWatchlistModal } = useWatchlistModal()
   const [stocks, setStocks] = useState<MyStockItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -91,13 +93,14 @@ export function MyStocksList({ onSelect }: MyStockListProps = {}) {
       <CardHeader className="pb-3">
         <CardTitle className="text-lg font-medium flex items-center justify-between">
           <span>我的股票</span>
-          <Link
-            href="/watchlist"
+          <button
+            type="button"
+            onClick={openWatchlistModal}
             className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
             管理
-          </Link>
+          </button>
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">

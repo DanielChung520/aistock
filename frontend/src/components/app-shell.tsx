@@ -9,9 +9,19 @@ import { RightSidebar } from '@/components/right-sidebar'
 import { Footer } from '@/components/footer'
 import { AIChatModal } from '@/components/ai-chat-modal'
 import { MyStocksDrawer } from '@/components/my-stocks-drawer'
+import { WatchlistModal } from '@/components/watchlist-modal'
+import { WatchlistModalProvider } from '@/lib/watchlist-modal-context'
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 
 export function AppShell({ children, title }: { children: React.ReactNode; title?: string }) {
+  return (
+    <WatchlistModalProvider>
+      <AppShellInner title={title}>{children}</AppShellInner>
+    </WatchlistModalProvider>
+  )
+}
+
+function AppShellInner({ children, title }: { children: React.ReactNode; title?: string }) {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
   const pathname = usePathname()
 
@@ -51,6 +61,7 @@ export function AppShell({ children, title }: { children: React.ReactNode; title
 
       <MyStocksDrawer />
       <AIChatModal />
+      <WatchlistModal />
     </div>
   )
 }
