@@ -155,10 +155,17 @@ jobs:
           print('Generated latest.json')
           PYEOF
           cat latest.json
+      - name: Verify latest.json exists
+        run: |
+          echo "=== latest.json content ==="
+          cat latest.json
+          echo "=== sigs dir ==="
+          ls -la sigs/ 2>&1 || echo "sigs/ not found"
+          find sigs -name "*.sig" 2>&1 | head -20 || echo "no sigs found"
       - name: Upload latest.json
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          file: latest.json
+          files: latest.json
           fail_on_unmatched_files: true
-          overwrite: true
+          overwrite_files: true
