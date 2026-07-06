@@ -17,6 +17,7 @@ export type CacheCategory =
   | 'stock-minute'        // 個股分鐘線
   | 'stock-minute-indicators'
   | 'stock-analysis'      // 個股分析（四大買賣點等）
+  | 'stock-catalog'       // 全部股票清單（1845+）
   | 'news-today'          // 今日新聞
   | 'menu'                // 選單
   | 'watchlist'           // 自選股（即時）
@@ -32,6 +33,7 @@ const TTL_MS: Record<CacheCategory, number> = {
   'stock-minute':            60 * 1000,                // 1 分鐘
   'stock-minute-indicators': 60 * 1000,                // 1 分鐘
   'stock-analysis':          60 * 60 * 1000,           // 1 小時
+  'stock-catalog':           24 * 60 * 60 * 1000,      // 24 小時（1845+ 股票）
   'news-today':              10 * 60 * 1000,           // 10 分鐘
   'menu':                    24 * 60 * 60 * 1000,      // 24 小時
   'watchlist':               0,                          // 不快取
