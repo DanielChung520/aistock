@@ -41,3 +41,8 @@ out/
 # Tauri generated icons (sub-folders)
 frontend/src-tauri/icons/android/
 frontend/src-tauri/icons/ios/
+
+# Tauri build artifacts
+src-tauri/target/
+src-tauri/gen/
+src-tauri/Cargo.lock.bak
