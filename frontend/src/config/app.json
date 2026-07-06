@@ -2,9 +2,9 @@
   "logo": {
     "src": "/logo.png",
     "height": "1.5rem",
-    "alt": "aiStock"
+    "alt": "EEA - My AI Stock"
   },
   "system": {
-    "name": "aiStock"
+    "name": "EEA - My AI Stock"
   }
 }
