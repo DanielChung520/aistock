@@ -30,7 +30,8 @@ pub fn run() {
     }
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        // updater plugin disabled until plugins.updater config is added to tauri.conf.json
+        // .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(move |app| {
             if let Some(window) = app.get_webview_window("main") {
