@@ -75,18 +75,19 @@ jobs:
         with:
           name: aistock-${{ matrix.os }}-sig
           path: |
-            frontend/src-tauri/target/release/bundle/**/*.sig
+            frontend/src-tauri/target/**/release/bundle/**/*.sig
           if-no-files-found: ignore
       - name: Upload bundles
         uses: actions/upload-artifact@v4
         with:
           name: aistock-${{ matrix.os }}
           path: |
-            frontend/src-tauri/target/release/bundle/**/*.dmg
-            frontend/src-tauri/target/release/bundle/**/*.msi
-            frontend/src-tauri/target/release/bundle/**/*.AppImage
-            frontend/src-tauri/target/release/bundle/**/*.deb
-            frontend/src-tauri/target/release/bundle/**/*.exe
+            frontend/src-tauri/target/**/release/bundle/**/*.dmg
+            frontend/src-tauri/target/**/release/bundle/**/*.msi
+            frontend/src-tauri/target/**/release/bundle/**/*.AppImage
+            frontend/src-tauri/target/**/release/bundle/**/*.deb
+            frontend/src-tauri/target/**/release/bundle/**/*.exe
+            frontend/src-tauri/target/**/release/bundle/**/*.app.tar.gz
           if-no-files-found: ignore
 
   generate-latest-json:
