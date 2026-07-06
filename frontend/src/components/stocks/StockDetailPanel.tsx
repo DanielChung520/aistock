@@ -11,6 +11,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertCircle } from 'lucide-react'
 import { useIndicatorSettings } from '@/hooks/use-indicator-settings'
+import { cachedFetch } from '@/lib/cache/cache-fetch'
+import { makeCacheKey } from '@/lib/cache/cache-keys'
 import type { StockHistoryItem, StockMinuteItem, IndicatorsResponse, IndicatorSettings } from '@/types/stock'
 
 function buildIndicatorParams(settings: IndicatorSettings): string {
@@ -81,25 +83,35 @@ export function StockDetailPanel({
       setStockName(externalName)
       return
     }
-    fetch(`/api/stocks/search?q=${encodeURIComponent(symbol)}`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((results: Array<{ stock_id: string; name: string }>) => {
-        const match = results.find((s) => s.stock_id === symbol)
-        const name = match?.name ?? symbol
-        setStockName(name)
-        onNameResolved?.(name)
-      })
-      .catch(() => {
-        setStockName(symbol)
-        onNameResolved?.(symbol)
-      })
+    cachedFetch<Array<{ stock_id: string; name: string }>>({
+      key: makeCacheKey('search', `q=${symbol}`),
+      category: 'search',
+      fetcher: async () => {
+        const res = await fetch(`/api/stocks/search?q=${encodeURIComponent(symbol)}`)
+        if (!res.ok) return []
+        return res.json()
+      },
+    }).then((r) => {
+      const results = r.data ?? []
+      const match = results.find((s) => s.stock_id === symbol)
+      const name = match?.name ?? symbol
+      setStockName(name)
+      onNameResolved?.(name)
+    })
   }, [symbol, externalName, onNameResolved])
 
   useEffect(() => {
-    fetch(`/api/stocks/${symbol}/analysis/best-four-point`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((bfp) => setBestFourPoint(bfp as BestFourPointResponse | null))
-      .catch(() => {})
+    cachedFetch<BestFourPointResponse | null>({
+      key: makeCacheKey('stock-analysis', symbol, 'best-four-point'),
+      category: 'stock-analysis',
+      fetcher: async () => {
+        const res = await fetch(`/api/stocks/${symbol}/analysis/best-four-point`)
+        if (!res.ok) return null
+        return res.json()
+      },
+    }).then((r) => {
+      if (r.data) setBestFourPoint(r.data)
+    })
   }, [symbol])
 
   const settingsRef = useRef(settings)
@@ -113,18 +125,33 @@ export function StockDetailPanel({
       const indicatorParams = buildIndicatorParams(settingsRef.current)
 
       Promise.all([
-        fetch(`/api/stocks/${symbol}/history?months=${selectedMonths}`).then((r) => {
-          if (!r.ok) throw new Error(`股票資料載入失敗 (${r.status})`)
-          return r.json() as Promise<StockHistoryItem[]>
+        cachedFetch<StockHistoryItem[]>({
+          key: makeCacheKey('stock-history', symbol, `months=${selectedMonths}`),
+          category: 'stock-history',
+          fetcher: async () => {
+            const res = await fetch(`/api/stocks/${symbol}/history?months=${selectedMonths}`)
+            if (!res.ok) throw new Error(`股票資料載入失敗 (${res.status})`)
+            return res.json()
+          },
         }),
-        fetch(`/api/stocks/${symbol}/indicators?months=${selectedMonths}&${indicatorParams}`).then((r) => {
-          if (!r.ok) throw new Error(`技術指標載入失敗 (${r.status})`)
-          return r.json() as Promise<IndicatorsResponse>
+        cachedFetch<IndicatorsResponse>({
+          key: makeCacheKey('stock-indicators', symbol, `months=${selectedMonths}`, indicatorParams),
+          category: 'stock-indicators',
+          fetcher: async () => {
+            const res = await fetch(
+              `/api/stocks/${symbol}/indicators?months=${selectedMonths}&${indicatorParams}`,
+            )
+            if (!res.ok) throw new Error(`技術指標載入失敗 (${res.status})`)
+            return res.json()
+          },
         }),
       ])
-        .then(([hist, ind]) => {
-          setHistory(hist)
-          setIndicators(ind)
+        .then(([histR, indR]) => {
+          if (histR.data) setHistory(histR.data)
+          if (indR.data) setIndicators(indR.data)
+          if (histR.isStale || indR.isStale) {
+            console.log(`[${symbol}] showing stale cache, refreshing in background`)
+          }
         })
         .catch((err: unknown) => {
           const message = err instanceof Error ? err.message : '載入失敗'
@@ -163,22 +190,41 @@ export function StockDetailPanel({
         const indicatorParams = buildIndicatorParams(settingsRef.current)
 
         Promise.all([
-          fetch(`/api/stocks/${symbol}/minute-history?days=${days}&interval=${minuteInterval}`).then((r) => {
-            if (!r.ok) throw new Error('分K資料載入失敗')
-            return r.json()
+          cachedFetch<StockMinuteItem[]>({
+            key: makeCacheKey('stock-minute', symbol, `days=${days}`, `interval=${minuteInterval}`),
+            category: 'stock-minute',
+            fetcher: async () => {
+              const res = await fetch(`/api/stocks/${symbol}/minute-history?days=${days}&interval=${minuteInterval}`)
+              if (!res.ok) throw new Error('分K資料載入失敗')
+              return res.json()
+            },
           }),
-          fetch(`/api/stocks/${symbol}/minute-indicators?days=${days}&interval=${minuteInterval}&${indicatorParams}`).then((r) => {
-            if (!r.ok) throw new Error('分K指標載入失敗')
-            return r.json()
+          cachedFetch<IndicatorsResponse>({
+            key: makeCacheKey(
+              'stock-minute-indicators',
+              symbol,
+              `days=${days}`,
+              `interval=${minuteInterval}`,
+              indicatorParams,
+            ),
+            category: 'stock-minute-indicators',
+            fetcher: async () => {
+              const res = await fetch(
+                `/api/stocks/${symbol}/minute-indicators?days=${days}&interval=${minuteInterval}&${indicatorParams}`,
+              )
+              if (!res.ok) throw new Error('分K指標載入失敗')
+              return res.json()
+            },
           }),
         ])
-          .then(([histData, indData]) => {
+          .then(([histR, indR]) => {
+            const histData = histR.data
             if (Array.isArray(histData)) {
-              setMinuteData(histData as StockMinuteItem[])
+              setMinuteData(histData)
             } else {
               setMinuteData([])
             }
-            setMinuteIndicators(indData as IndicatorsResponse)
+            if (indR.data) setMinuteIndicators(indR.data)
           })
           .catch((err: unknown) => {
             console.error(err)

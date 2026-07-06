@@ -14,6 +14,8 @@ import { cn } from '@/lib/utils'
 import { Maximize2, Minimize2, ArrowLeft } from 'lucide-react'
 import { useIndicatorSettings } from '@/hooks/use-indicator-settings'
 import { useStockTabs } from '@/lib/stock-tab-context'
+import { cachedFetch } from '@/lib/cache/cache-fetch'
+import { makeCacheKey } from '@/lib/cache/cache-keys'
 import type { IndicatorsResponse, IndicatorSettings } from '@/types/stock'
 
 type TaiexDataPoint = {
@@ -179,20 +181,36 @@ export default function DashboardPage() {
     async function fetchTaiex() {
       setLoadingTaiex(true)
       try {
-        const [histRes, indRes] = await Promise.all([
-          fetch(`/api/market/taiex?months=${selectedMonths}`),
-          fetch(
-            `/api/market/taiex/indicators?months=${selectedMonths}&${buildIndicatorParams(settingsRef.current)}`,
-          ),
+        const indicatorParams = buildIndicatorParams(settingsRef.current)
+
+        const [histResult, indResult] = await Promise.all([
+          cachedFetch<TaiexData>({
+            key: makeCacheKey('taiex-history', `months=${selectedMonths}`),
+            category: 'taiex-history',
+            fetcher: async () => {
+              const res = await fetch(`/api/market/taiex?months=${selectedMonths}`)
+              if (!res.ok) return null
+              return (await res.json()) as TaiexData
+            },
+          }),
+          cachedFetch<IndicatorsResponse>({
+            key: makeCacheKey('taiex-indicators', `months=${selectedMonths}`, indicatorParams),
+            category: 'taiex-indicators',
+            fetcher: async () => {
+              const res = await fetch(
+                `/api/market/taiex/indicators?months=${selectedMonths}&${indicatorParams}`,
+              )
+              if (!res.ok) return null
+              return (await res.json()) as IndicatorsResponse
+            },
+          }),
         ])
 
-        if (histRes.ok) {
-          const data = (await histRes.json()) as TaiexData
-          setTaiex(data)
-        }
-        if (indRes.ok) {
-          const indData = (await indRes.json()) as IndicatorsResponse
-          setIndicators(indData)
+        if (histResult.data) setTaiex(histResult.data)
+        if (indResult.data) setIndicators(indResult.data)
+
+        if (histResult.isStale || indResult.isStale) {
+          console.log('[taiex] showing stale cache, refreshing in background')
         }
       } catch (error) {
         console.error('Failed to fetch TAIEX:', error)
