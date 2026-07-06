@@ -1,0 +1,6 @@
+{
+  "items": [
+    { "id": "version", "text": "aiStock v0.3.2" },
+    { "id": "status",  "text": "已連線" }
+  ]
+}

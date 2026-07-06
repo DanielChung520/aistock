@@ -3,30 +3,21 @@
 import { X, Home } from 'lucide-react'
 import { useTabs } from '../lib/tabs'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
-import { cn } from '@/lib/utils'
+import type { ThemeConfig } from '../types'
 
 export interface PageTabsBarProps {
+  theme: ThemeConfig
   className?: string
 }
 
-export function PageTabsBar({ className }: PageTabsBarProps) {
+export function PageTabsBar({ theme, className }: PageTabsBarProps) {
   const { tabs, activeTabId, setActiveTab, closeTab, homeTitle } = useTabs()
 
   return (
-    <div
-      className={cn(
-        'h-10 border-b border-border bg-card/40 backdrop-blur-sm flex items-center px-2 gap-1 shrink-0',
-        className,
-      )}
-    >
+    <div className={[theme.classes.tabBar, className].filter(Boolean).join(' ')}>
       <button
         onClick={() => setActiveTab(null)}
-        className={cn(
-          'inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium transition-colors',
-          activeTabId === null
-            ? 'bg-card text-foreground border border-border shadow-sm'
-            : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
-        )}
+        className={activeTabId === null ? theme.classes.tabHomeActive : theme.classes.tabHome}
         title="首頁"
       >
         <Home className="h-3.5 w-3.5" />
@@ -43,12 +34,7 @@ export function PageTabsBar({ className }: PageTabsBarProps) {
                 return (
                   <div
                     key={tab.id}
-                    className={cn(
-                      'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-xs cursor-pointer select-none transition-colors border',
-                      isActive
-                        ? 'bg-card text-foreground border-border shadow-sm'
-                        : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 border-transparent',
-                    )}
+                    className={isActive ? theme.classes.tabActive : theme.classes.tab}
                     onClick={() => setActiveTab(tab.id)}
                   >
                     <span className="font-mono">{tab.id}</span>
@@ -58,7 +44,7 @@ export function PageTabsBar({ className }: PageTabsBarProps) {
                         e.stopPropagation()
                         closeTab(tab.id)
                       }}
-                      className="ml-0.5 p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
+                      className={theme.classes.tabClose}
                       title="關閉分頁"
                     >
                       <X className="h-3 w-3" />

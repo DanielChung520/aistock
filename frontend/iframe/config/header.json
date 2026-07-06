@@ -1,0 +1,12 @@
+{
+  "logo": "aiStock",
+  "left": {
+    "type": "tabs"
+  },
+  "right": {
+    "items": [
+      { "id": "settings", "title": "設定", "icon": "Settings", "label": "設定", "behavior": "modal" },
+      { "id": "update",   "title": "檢查更新", "icon": "RefreshCw", "label": "檢查更新", "behavior": "modal" }
+    ]
+  }
+}

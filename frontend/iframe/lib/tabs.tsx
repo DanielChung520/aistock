@@ -1,17 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react'
-
-export type TabBehavior = 'switch' | 'newTab'
-
-export interface TabItem {
-  id: string
-  title: string
-  subtitle?: string
-  route: string
-  icon?: string
-  meta?: Record<string, unknown>
-}
+import type { TabItem, TabBehavior } from '../types'
 
 interface TabsContextType {
   tabs: TabItem[]
@@ -30,39 +20,30 @@ const TabsContext = createContext<TabsContextType | null>(null)
 
 export interface TabsProviderProps {
   children: ReactNode
-  homeRoute?: string
-  homeTitle?: string
+  homeRoute: string
+  homeTitle: string
 }
 
-export function TabsProvider({ children, homeRoute = '/', homeTitle = '首頁' }: TabsProviderProps) {
+export function TabsProvider({ children, homeRoute, homeTitle }: TabsProviderProps) {
   const [tabs, setTabs] = useState<TabItem[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
 
   const openTab = useCallback(
     (item: Omit<TabItem, 'id'> & { id?: string }, behavior: TabBehavior = 'newTab') => {
       const id = item.id ?? item.route
-
-      if (behavior === 'switch') {
-        const existing = tabs.find((t) => t.id === id)
+      setTabs((prev) => {
+        const existing = prev.find((t) => t.id === id)
         if (existing) {
           setActiveTabId(id)
-          return id
+          return prev
         }
-        setTabs((prev) => [...prev, { ...item, id }])
+        const next = [...prev, { ...item, id }]
         setActiveTabId(id)
-        return id
-      }
-
-      const existing = tabs.find((t) => t.id === id)
-      if (existing) {
-        setActiveTabId(id)
-        return id
-      }
-      setTabs((prev) => [...prev, { ...item, id }])
-      setActiveTabId(id)
+        return next
+      })
       return id
     },
-    [tabs],
+    [],
   )
 
   const closeTab = useCallback(

@@ -1,41 +1,33 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useActions, type SidebarItem } from '../lib/actions'
-import { cn } from '@/lib/utils'
+import { useActions } from '../lib/actions'
+import type { SidebarItem, ThemeConfig } from '../types'
 import * as Icons from 'lucide-react'
 
 export interface SidebarProps {
-  items?: SidebarItem[]
+  items: SidebarItem[]
+  theme: ThemeConfig
   className?: string
 }
 
-export function Sidebar({ items, className }: SidebarProps) {
-  const { sidebar, registerSidebar, trigger } = useActions()
+export function Sidebar({ items, theme, className }: SidebarProps) {
+  const { registerSidebar, trigger } = useActions()
 
   useEffect(() => {
-    if (items && items.length > 0) {
-      registerSidebar(items)
-    }
+    registerSidebar(items)
   }, [items, registerSidebar])
 
-  const display = items && items.length > 0 ? items : sidebar
-
   return (
-    <aside
-      className={cn(
-        'w-14 border-r border-border bg-card/40 backdrop-blur-sm flex flex-col items-center py-2 gap-1 shrink-0',
-        className,
-      )}
-    >
-      {display.map((item) => {
+    <aside className={[theme.classes.sidebarL, className].filter(Boolean).join(' ')}>
+      {items.map((item) => {
         const Icon = resolveIcon(item.icon)
         return (
           <button
             key={item.id}
             onClick={() => trigger(item)}
             title={item.tooltip ?? item.title}
-            className="w-10 h-10 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
+            className={theme.classes.sidebarButton}
           >
             <Icon className="w-5 h-5" />
           </button>

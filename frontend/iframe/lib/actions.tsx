@@ -1,36 +1,20 @@
 'use client'
 
 import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react'
-import { useTabs, type TabItem } from './tabs'
-
-export type ActionBehavior = 'switch' | 'newTab' | 'modal' | 'drawer-left' | 'drawer-right'
-
-export interface SidebarItem {
-  id: string
-  title: string
-  icon: string
-  route: string
-  behavior?: ActionBehavior
-  tooltip?: string
-  meta?: Record<string, unknown>
-}
-
-export interface ModalPayload {
-  id: string
-  title: string
-  component: string
-  props?: Record<string, unknown>
-}
+import { useTabs } from './tabs'
+import type { SidebarItem, HeaderRightItem, TabItem, ActionBehavior, ModalPayload } from '../types'
 
 interface ActionsContextType {
   sidebar: SidebarItem[]
+  headerRight: HeaderRightItem[]
   registerSidebar: (items: SidebarItem[]) => void
+  registerHeaderRight: (items: HeaderRightItem[]) => void
 
   activeModal: ModalPayload | null
   activeLeftDrawer: SidebarItem | null
   activeRightDrawer: SidebarItem | null
 
-  trigger: (item: SidebarItem | { id: string }) => void
+  trigger: (item: SidebarItem | HeaderRightItem | { id: string }) => void
   closeModal: () => void
   closeLeftDrawer: () => void
   closeRightDrawer: () => void
@@ -41,6 +25,7 @@ const ActionsContext = createContext<ActionsContextType | null>(null)
 export function ActionsProvider({ children }: { children: ReactNode }) {
   const tabs = useTabs()
   const [sidebar, setSidebar] = useState<SidebarItem[]>([])
+  const [headerRight, setHeaderRight] = useState<HeaderRightItem[]>([])
   const [activeModal, setActiveModal] = useState<ModalPayload | null>(null)
   const [activeLeftDrawer, setActiveLeftDrawer] = useState<SidebarItem | null>(null)
   const [activeRightDrawer, setActiveRightDrawer] = useState<SidebarItem | null>(null)
@@ -49,26 +34,32 @@ export function ActionsProvider({ children }: { children: ReactNode }) {
     setSidebar(items)
   }, [])
 
+  const registerHeaderRight = useCallback((items: HeaderRightItem[]) => {
+    setHeaderRight(items)
+  }, [])
+
   const trigger = useCallback(
-    (input: SidebarItem | { id: string }) => {
+    (input: SidebarItem | HeaderRightItem | { id: string }) => {
+      const all = [...sidebar, ...headerRight]
       const item = 'route' in input
         ? input
-        : sidebar.find((s) => s.id === input.id)
+        : all.find((s) => s.id === input.id)
       if (!item) return
 
-      const behavior: ActionBehavior = item.behavior ?? 'newTab'
+      const behavior: ActionBehavior = item.behavior
 
       switch (behavior) {
         case 'switch':
         case 'newTab': {
+          const route = 'route' in item && item.route ? item.route : item.id
           const tab: Omit<TabItem, 'id'> & { id?: string } = {
             id: item.id,
             title: item.title,
-            route: item.route,
+            route,
             icon: item.icon,
             meta: item.meta,
           }
-          tabs.openTab(tab, behavior === 'switch' ? 'switch' : 'newTab')
+          tabs.openTab(tab, behavior)
           break
         }
         case 'modal': {
@@ -81,16 +72,16 @@ export function ActionsProvider({ children }: { children: ReactNode }) {
           break
         }
         case 'drawer-left': {
-          setActiveLeftDrawer(item)
+          setActiveLeftDrawer(item as SidebarItem)
           break
         }
         case 'drawer-right': {
-          setActiveRightDrawer(item)
+          setActiveRightDrawer(item as SidebarItem)
           break
         }
       }
     },
-    [sidebar, tabs],
+    [sidebar, headerRight, tabs],
   )
 
   const closeModal = useCallback(() => setActiveModal(null), [])
@@ -100,7 +91,9 @@ export function ActionsProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       sidebar,
+      headerRight,
       registerSidebar,
+      registerHeaderRight,
       activeModal,
       activeLeftDrawer,
       activeRightDrawer,
@@ -109,7 +102,19 @@ export function ActionsProvider({ children }: { children: ReactNode }) {
       closeLeftDrawer,
       closeRightDrawer,
     }),
-    [sidebar, registerSidebar, activeModal, activeLeftDrawer, activeRightDrawer, trigger, closeModal, closeLeftDrawer, closeRightDrawer],
+    [
+      sidebar,
+      headerRight,
+      registerSidebar,
+      registerHeaderRight,
+      activeModal,
+      activeLeftDrawer,
+      activeRightDrawer,
+      trigger,
+      closeModal,
+      closeLeftDrawer,
+      closeRightDrawer,
+    ],
   )
 
   return <ActionsContext.Provider value={value}>{children}</ActionsContext.Provider>

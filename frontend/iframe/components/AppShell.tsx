@@ -1,55 +1,96 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { TabsProvider } from '../lib/tabs'
-import { ActionsProvider, type SidebarItem } from '../lib/actions'
+import { ActionsProvider } from '../lib/actions'
 import { Sidebar } from './Sidebar'
+import { Header } from './Header'
+import { Footer } from './Footer'
+import { Modal } from './Modal'
+import { Drawer } from './Drawer'
 import { PageTabsBar } from './PageTabsBar'
-import { cn } from '@/lib/utils'
+import { loadSidebar, loadHeader, loadFooter, loadLayout, loadTheme } from '../lib/load-config'
+import type {
+  SidebarConfig,
+  HeaderConfig,
+  FooterConfig,
+  LayoutConfig,
+  ThemeConfig,
+} from '../types'
 
 export interface AppShellProps {
+  basePath?: string
   children: React.ReactNode
-  sidebarItems?: SidebarItem[]
   homeRoute?: string
   homeTitle?: string
-  rightSidebar?: React.ReactNode
-  footer?: React.ReactNode
-  headerExtras?: React.ReactNode
 }
 
 export function AppShell({
+  basePath = '/iframe',
   children,
-  sidebarItems,
   homeRoute = '/',
   homeTitle = '首頁',
-  rightSidebar,
-  footer,
-  headerExtras,
 }: AppShellProps) {
+  const [layout, setLayout] = useState<LayoutConfig | null>(null)
+  const [header, setHeader] = useState<HeaderConfig | null>(null)
+  const [footer, setFooter] = useState<FooterConfig | null>(null)
+  const [sidebar, setSidebar] = useState<SidebarConfig | null>(null)
+  const [theme, setTheme] = useState<ThemeConfig | null>(null)
+
+  useEffect(() => {
+    void (async () => {
+      const [l, h, f, s, t] = await Promise.all([
+        loadLayout(),
+        loadHeader(),
+        loadFooter(),
+        loadSidebar(),
+        loadTheme(),
+      ])
+      setLayout(l)
+      setHeader(h)
+      setFooter(f)
+      setSidebar(s)
+      setTheme(t)
+    })()
+  }, [basePath])
+
+  if (!layout || !header || !footer || !sidebar || !theme) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center text-muted-foreground">
+        載入中…
+      </div>
+    )
+  }
+
   return (
     <TabsProvider homeRoute={homeRoute} homeTitle={homeTitle}>
       <ActionsProvider>
-        <div className="h-screen w-screen flex flex-col bg-background text-foreground overflow-hidden">
-          <header className="h-12 border-b border-border bg-card/40 backdrop-blur-sm flex items-center px-4 shrink-0">
-            <div className="flex-1 min-w-0">{headerExtras ?? <PageTabsBar className="border-0 h-12 px-0 bg-transparent" />}</div>
-          </header>
+        <div className={theme.classes.shell}>
+          {layout.regions.header.visible && (
+            <Header
+              config={header}
+              theme={theme}
+              tabs={<PageTabsBar theme={theme} />}
+            />
+          )}
 
           <div className="flex-1 flex min-h-0">
-            <Sidebar items={sidebarItems} />
+            {layout.regions.sidebarL.visible && (
+              <Sidebar items={sidebar.items} theme={theme} />
+            )}
 
-            <main className="flex-1 min-w-0 overflow-auto">{children}</main>
+            <main className={theme.classes.main}>{children}</main>
 
-            {rightSidebar && (
-              <aside className="w-72 border-l border-border bg-card/30 shrink-0 overflow-auto">
-                {rightSidebar}
-              </aside>
+            {layout.regions.sidebarR.visible && (
+              <Drawer side="right" theme={theme} />
             )}
           </div>
 
-          {footer && (
-            <footer className="h-8 border-t border-border bg-card/30 flex items-center px-4 text-xs text-muted-foreground shrink-0">
-              {footer}
-            </footer>
+          {layout.regions.footer.visible && (
+            <Footer config={footer} theme={theme} />
           )}
+
+          <Modal theme={theme} />
         </div>
       </ActionsProvider>
     </TabsProvider>

@@ -1,0 +1,18 @@
+{
+  "name": "shadcn-default",
+  "classes": {
+    "shell": "h-screen w-screen flex flex-col bg-background text-foreground overflow-hidden",
+    "header": "border-b border-border bg-card/40 backdrop-blur-sm flex items-center px-4 shrink-0",
+    "sidebarL": "w-14 border-r border-border bg-card/40 backdrop-blur-sm flex flex-col items-center py-2 gap-1 shrink-0",
+    "sidebarR": "w-72 border-l border-border bg-card/30 shrink-0 overflow-auto",
+    "footer": "h-8 border-t border-border bg-card/30 flex items-center px-4 text-xs text-muted-foreground shrink-0",
+    "main": "flex-1 min-w-0 overflow-auto",
+    "sidebarButton": "w-10 h-10 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors",
+    "tabBar": "h-10 border-b border-border bg-card/40 backdrop-blur-sm flex items-center px-2 gap-1 shrink-0",
+    "tab": "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-xs cursor-pointer select-none transition-colors border bg-muted/30 text-muted-foreground hover:bg-muted/50 border-transparent",
+    "tabActive": "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-xs cursor-pointer select-none transition-colors border bg-card text-foreground border-border shadow-sm",
+    "tabHome": "inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium transition-colors text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+    "tabHomeActive": "inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium transition-colors bg-card text-foreground border border-border shadow-sm",
+    "tabClose": "ml-0.5 p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
+  }
+}

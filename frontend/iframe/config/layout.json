@@ -1,0 +1,9 @@
+{
+  "id": "aiStock",
+  "regions": {
+    "header": { "visible": true, "height": "3rem" },
+    "sidebarL": { "visible": true, "width": "3.5rem" },
+    "sidebarR": { "visible": true, "width": "18rem" },
+    "footer": { "visible": true, "height": "2rem" }
+  }
+}
