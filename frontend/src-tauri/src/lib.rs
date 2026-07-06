@@ -1,9 +1,7 @@
 use log::info;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::time::Duration;
-use std::thread;
-use tauri::Manager;
+use tauri::WebviewWindow;
 
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -19,14 +17,12 @@ pub fn run() {
     let next_handle = spawn_frontend(&project_root);
     info!("Next.js server spawned (PID: {})", next_handle.id());
 
-    wait_for_url("http://localhost:3300", Duration::from_secs(30));
-
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(move |app| {
-            if let Some(window) = app.get_window("main") {
-                window.set_title("aiStock - 台股分析平台").ok();
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_title("aiStock - 台股分析平台");
                 info!("Window loading Next.js server");
             }
             Ok(())
@@ -66,7 +62,6 @@ fn spawn_backend(project_root: &Path) -> Child {
         .stderr(Stdio::null())
         .spawn()
         .unwrap_or_else(|_| {
-            // Fallback to system python
             Command::new("python3")
                 .arg("-m")
                 .arg("uvicorn")
@@ -96,17 +91,4 @@ fn spawn_frontend(project_root: &Path) -> Child {
         .stderr(Stdio::null())
         .spawn()
         .expect("failed to spawn frontend")
-}
-
-fn wait_for_url(url: &str, timeout: Duration) {
-    use std::time::Instant;
-    let start = Instant::now();
-    while start.elapsed() < timeout {
-        if reqwest::blocking::get(url).is_ok() {
-            info!("URL ready: {}", url);
-            return;
-        }
-        thread::sleep(Duration::from_millis(500));
-    }
-    info!("URL timeout (continuing): {}", url);
 }
