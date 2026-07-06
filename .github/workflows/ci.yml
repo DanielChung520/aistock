@@ -29,6 +29,15 @@ jobs:
       - run: pnpm run lint || true  # 既有錯誤不擋 PR
       - run: pnpm run build || true  # build 可能需要 env，先允許失敗
 
+  # Tauri config pre-flight check
+  tauri-config-check:
+    name: Tauri Config Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate tauri.conf.json
+        run: bash scripts/validate-tauri-config.sh
+
   # Backend (FastAPI) checks
   backend-checks:
     name: Backend Compile Check
