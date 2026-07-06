@@ -1,15 +1,13 @@
 'use client'
 
-import { useState, use } from 'react'
+import { Suspense, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
 import { StockDetailPanel } from '@/components/stocks/StockDetailPanel'
 
-export default function StockDetailPage({
-  params,
-}: {
-  params: Promise<{ symbol: string }>
-}) {
-  const { symbol } = use(params)
+function StockDetailContent() {
+  const searchParams = useSearchParams()
+  const symbol = searchParams.get('symbol') ?? ''
   const [stockName, setStockName] = useState('')
 
   const headerTitle = stockName ? `${stockName}-${symbol}` : symbol
@@ -24,5 +22,13 @@ export default function StockDetailPage({
         />
       </div>
     </AppShell>
+  )
+}
+
+export default function StockDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <StockDetailContent />
+    </Suspense>
   )
 }

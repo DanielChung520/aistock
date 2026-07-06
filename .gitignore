@@ -44,5 +44,17 @@ frontend/src-tauri/icons/ios/
 
 # Tauri build artifacts
 src-tauri/target/
+frontend/src-tauri/target/
 src-tauri/gen/
+frontend/src-tauri/gen/
 src-tauri/Cargo.lock.bak
+
+# Downloaded installer artifacts
+aiStock_*.dmg
+aiStock_*.msi
+aiStock_*.AppImage
+aiStock_*.deb
+aiStock_*.exe
+
+# AI tool runtime state
+.omo/

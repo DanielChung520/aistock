@@ -1,10 +1,10 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "aiStock",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "identifier": "com.aistock.app",
   "build": {
-    "frontendDist": "../.next",
+    "frontendDist": "../out",
     "devUrl": "http://localhost:33300",
     "beforeDevCommand": "pnpm run dev",
     "beforeBuildCommand": "pnpm run build"

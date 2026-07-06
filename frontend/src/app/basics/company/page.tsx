@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { Suspense, useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AppShell } from '@/components/app-shell'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -55,7 +55,7 @@ type CompanyInfo = {
 
 const FieldRow = ({ label, value, linkUrl, linkType }: { label: string; value?: string | null; linkUrl?: string | null; linkType?: 'email' | 'url' }) => {
   const displayValue = value && value.trim() ? value : '—'
-  
+
   let content = <span className="text-sm break-all">{displayValue}</span>
 
   if (linkUrl && displayValue !== '—') {
@@ -83,9 +83,9 @@ const FieldRow = ({ label, value, linkUrl, linkType }: { label: string; value?: 
   )
 }
 
-export default function CompanyBasicInfoPage() {
-  const params = useParams()
-  const symbol = params.symbol as string
+function CompanyBasicInfoContent() {
+  const searchParams = useSearchParams()
+  const symbol = searchParams.get('symbol') ?? ''
 
   const [data, setData] = useState<CompanyInfo | null>(null)
   const [loading, setLoading] = useState(true)
@@ -93,7 +93,10 @@ export default function CompanyBasicInfoPage() {
 
   useEffect(() => {
     async function fetchCompanyInfo() {
-      if (!symbol) return
+      if (!symbol) {
+        setLoading(false)
+        return
+      }
 
       try {
         setLoading(true)
@@ -130,7 +133,7 @@ export default function CompanyBasicInfoPage() {
               </Link>
             </Button>
           </div>
-          
+
           <div>
             {loading ? (
               <Skeleton className="h-9 w-64" />
@@ -300,5 +303,13 @@ export default function CompanyBasicInfoPage() {
         )}
       </div>
     </AppShell>
+  )
+}
+
+export default function CompanyBasicInfoPage() {
+  return (
+    <Suspense fallback={null}>
+      <CompanyBasicInfoContent />
+    </Suspense>
   )
 }
