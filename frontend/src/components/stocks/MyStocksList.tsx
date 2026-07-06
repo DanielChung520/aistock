@@ -18,6 +18,8 @@ interface MyStockItem {
   close: number
   change: number
   changePercent: number
+  volume: number
+  volumeChangePercent: number
 }
 
 export function MyStocksList({ onSelect }: MyStockListProps = {}) {
@@ -60,12 +62,21 @@ export function MyStocksList({ onSelect }: MyStockListProps = {}) {
                 const changePercent =
                   previous.close !== 0 ? (change / previous.close) * 100 : 0
 
+                const volume = latest.volume ?? 0
+                const previousVolume = previous.volume ?? 0
+                const volumeChangePercent =
+                  previousVolume !== 0
+                    ? ((volume - previousVolume) / previousVolume) * 100
+                    : 0
+
                 return {
                   stock_id: item.stock_id,
                   name: item.name || item.stock_id,
                   close,
                   change,
                   changePercent,
+                  volume,
+                  volumeChangePercent,
                 }
               }
             } catch {
@@ -145,9 +156,22 @@ export function MyStocksList({ onSelect }: MyStockListProps = {}) {
                   ? TrendingDown
                   : Minus
 
+              const volumeColorClass = stock.volumeChangePercent > 0
+                ? 'text-red-500'
+                : stock.volumeChangePercent < 0
+                  ? 'text-green-500'
+                  : 'text-muted-foreground'
+
+              const formatVolume = (v: number) => {
+                if (v >= 100_000_000) return `${(v / 100_000_000).toFixed(2)}億`
+                if (v >= 10_000) return `${(v / 10_000).toFixed(1)}萬`
+                if (v >= 1_000) return `${(v / 1_000).toFixed(1)}k`
+                return v.toString()
+              }
+
               const content = (
-                <>
-                  <div className="min-w-0">
+                <div className="flex w-full items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-mono text-muted-foreground">
                         {stock.stock_id}
@@ -156,18 +180,25 @@ export function MyStocksList({ onSelect }: MyStockListProps = {}) {
                         {stock.name}
                       </span>
                     </div>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                      <span>量 {formatVolume(stock.volume)}</span>
+                      <span className={volumeColorClass}>
+                        {stock.volumeChangePercent > 0 ? '+' : ''}
+                        {stock.volumeChangePercent.toFixed(2)}%
+                      </span>
+                    </div>
                   </div>
-                  <div className={cn('text-right flex items-center gap-2', colorClass)}>
-                    <span className="text-sm font-semibold tabular-nums">
+                  <div className="text-right shrink-0">
+                    <div className={cn('text-sm font-semibold tabular-nums', colorClass)}>
                       {stock.close.toFixed(2)}
-                    </span>
-                    <span className="flex items-center gap-0.5 text-xs">
+                    </div>
+                    <div className={cn('flex items-center justify-end gap-0.5 text-xs mt-1', colorClass)}>
                       <Icon className="h-3 w-3" />
                       {stock.changePercent > 0 ? '+' : ''}
                       {stock.changePercent.toFixed(2)}%
-                    </span>
+                    </div>
                   </div>
-                </>
+                </div>
               )
 
               if (onSelect) {
