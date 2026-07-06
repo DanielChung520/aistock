@@ -49,6 +49,8 @@ export interface HeaderRightItem {
 
 export interface HeaderConfig {
   logo: string
+  logoImage?: string
+  logoHeight?: string
   left: {
     type: 'tabs' | 'none'
   }

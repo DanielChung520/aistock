@@ -1,5 +1,7 @@
 {
   "logo": "aiStock",
+  "logoImage": "/logo.png",
+  "logoHeight": "2rem",
   "left": {
     "type": "tabs"
   },

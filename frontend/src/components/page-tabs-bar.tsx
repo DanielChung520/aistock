@@ -4,12 +4,24 @@ import { X, Home } from 'lucide-react'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { useStockTabs } from '@/lib/stock-tab-context'
 import { cn } from '@/lib/utils'
+import appConfig from '@/config/app.json'
 
 export function PageTabsBar() {
   const { tabs, activeTab, setActiveTab, closeTab } = useStockTabs()
 
   return (
     <div className="h-10 border-b border-border bg-card/40 backdrop-blur-sm flex items-center px-2 gap-1 shrink-0">
+      <img
+        src={appConfig.logo.src}
+        alt={appConfig.logo.alt}
+        style={{ height: appConfig.logo.height }}
+        className="object-contain shrink-0"
+      />
+      <span className="text-xs font-medium text-muted-foreground whitespace-nowrap pr-2">
+        {appConfig.system.name}
+      </span>
+      <div className="h-5 w-px bg-border mx-0.5" />
+
       <button
         onClick={() => setActiveTab(null)}
         className={cn(
@@ -37,7 +49,7 @@ export function PageTabsBar() {
                     className={cn(
                       'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-xs cursor-pointer select-none transition-colors border',
                       isActive
-                        ? 'bg-card text-foreground border-border shadow-sm'
+                        ? 'bg-card text-foreground border border-border shadow-sm'
                         : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 border-transparent',
                     )}
                     onClick={() => setActiveTab(tab.symbol)}

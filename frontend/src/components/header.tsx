@@ -32,7 +32,7 @@ export function Header({ onMenuClick, title }: { onMenuClick?: () => void; title
   return (
     <header className="relative z-20 h-[60px] w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-full items-center justify-between px-4 lg:px-6">
-        {/* Left side - can be used for breadcrumbs or page title */}
+        {/* Left side - page title */}
         <div className="flex items-center gap-2 lg:gap-4">
           <Button
             variant="ghost"

@@ -21,7 +21,16 @@ export function Header({ config, theme, tabs }: HeaderProps) {
   return (
     <header className={theme.classes.header}>
       <div className="flex items-center gap-3 shrink-0">
-        <span className="font-semibold text-sm">{config.logo}</span>
+        {config.logoImage ? (
+          <img
+            src={config.logoImage}
+            alt={config.logo}
+            style={{ height: config.logoHeight ?? '2rem' }}
+            className="object-contain"
+          />
+        ) : (
+          <span className="font-semibold text-sm">{config.logo}</span>
+        )}
       </div>
 
       <div className="flex-1 min-w-0 mx-4">
