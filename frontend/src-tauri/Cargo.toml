@@ -3,17 +3,22 @@ name = "aistock"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "aistock_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
 [build-dependencies]
-tauri-build = { version = "1", features = [] }
+tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "1", features = ["devtools"] }
+tauri = { version = "2", features = [] }
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 log = "0.4"
 env_logger = "0.11"
 
 [features]
-default = []
-devtools = ["tauri/devtools"]
+default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]

@@ -12,7 +12,10 @@
     "db:seed": "npx tsx scripts/seed-menu.ts",
     "db:reset": "npx tsx scripts/reset-menu.ts",
     "tauri-start": "bash ../scripts/start.sh",
-    "tauri-stop": "bash ../scripts/stop.sh"
+    "tauri-stop": "bash ../scripts/stop.sh",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.958.0",
@@ -72,7 +75,10 @@
     "tailwind-merge": "^2.6.0",
     "tw-animate-css": "^1.4.0",
     "vaul": "^1.1.2",
-    "zod": "^4.3.5"
+    "zod": "^4.3.5",
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-updater": "^2.0.0",
+    "@tauri-apps/plugin-process": "^2.0.0"
   },
   "devDependencies": {
     "@react-dev-inspector/babel-plugin": "^2.0.1",
@@ -89,7 +95,8 @@
     "react-dev-inspector": "^2.0.1",
     "shadcn": "latest",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "@tauri-apps/cli": "^2.0.0"
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {
