@@ -25,14 +25,7 @@
       }
     ],
     "security": {
-      "csp": null,
-      "dangerousRemoteDomainIpcAccess": [
-        {
-          "domain": "localhost",
-          "enableTauriAPI": true,
-          "windows": ["main"]
-        }
-      ]
+      "csp": null
     }
   },
   "bundle": {
@@ -43,17 +36,6 @@
     "shortDescription": "台股分析平台",
     "longDescription": "aiStock - 台股分析平台，提供 K 線圖、技術指標、法人買賣、即時新聞與 AI 助手。",
     "publisher": "aiStock"
-  },
-  "updater": {
-    "active": true,
-    "dialog": true,
-    "endpoints": [
-      "https://github.com/DanielChung520/aistock/releases/latest/download/latest.json"
-    ],
-    "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY4MzA0MzI2RDZBMzQ5NEEKUldSS1NhUFdKa013YUUrU2RuQnRIS3F1djBxemVmYkpyZ2thRVIreDQ5dEM3V3dFSVBwRnhkcTYK",
-    "windows": {
-      "installMode": "passive"
-    }
   },
   "plugins": {}
 }
