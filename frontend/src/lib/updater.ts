@@ -16,7 +16,7 @@ interface UpdateStore {
   dismiss: () => void
 }
 
-const GITHUB_RELEASES_URL = 'https://github.com/DanielChung520/aistock/releases/latest/download/latest.json'
+const GITHUB_API_URL = 'https://api.github.com/repos/DanielChung520/aistock/releases/latest'
 
 export const useUpdateStore = create<UpdateStore>((set, get) => ({
   state: { phase: 'idle' },
@@ -34,16 +34,42 @@ export const useUpdateStore = create<UpdateStore>((set, get) => ({
           set({ state: { phase: 'not-available' } })
         }
       } else {
-        // Web fallback: fetch latest.json from GitHub Releases
-        const res = await fetch(GITHUB_RELEASES_URL, { cache: 'no-store' })
-        if (!res.ok) {
-          set({ state: { phase: 'not-available' } })
-          return
-        }
-        const data = await res.json() as { version?: string; notes?: string }
-        if (data.version) {
-          set({ state: { phase: 'available', version: data.version, notes: data.notes } })
-        } else {
+        // Web fallback: fetch latest release info from GitHub API (CORS-friendly)
+        try {
+          const res = await fetch(GITHUB_API_URL, {
+            cache: 'no-store',
+            headers: { 'Accept': 'application/vnd.github+json' },
+          })
+          if (!res.ok) {
+            set({ state: { phase: 'not-available' } })
+            return
+          }
+          const release = await res.json() as {
+            tag_name?: string
+            name?: string
+            body?: string
+            html_url?: string
+            published_at?: string
+          }
+          // tag_name like "v0.2.0" → strip "v" prefix
+          const latestVersion = (release.tag_name || '').replace(/^v/, '')
+          if (!latestVersion) {
+            set({ state: { phase: 'not-available' } })
+            return
+          }
+          // 比較版本
+          if (compareVersions(latestVersion, getCurrentVersion()) > 0) {
+            set({
+              state: {
+                phase: 'available',
+                version: latestVersion,
+                notes: release.body || release.name,
+              },
+            })
+          } else {
+            set({ state: { phase: 'not-available' } })
+          }
+        } catch (e) {
           set({ state: { phase: 'not-available' } })
         }
       }
