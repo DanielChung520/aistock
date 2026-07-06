@@ -52,7 +52,7 @@
       "endpoints": [
         "https://github.com/DanielChung520/aistock/releases/latest/download/latest.json"
       ],
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY4MzA0MzI2RDZBMzQ5NEEKUldSS1NhUFdKa013YUUrU2RuQnRIS3F1djBxemVmYkpyZ2thRVIreDQ5dEM3V3dFSVBwRnhkcTYK",
       "windows": {
         "installMode": "passive"
       }
@@ -62,7 +62,7 @@
         "endpoints": [
           "https://github.com/DanielChung520/aistock/releases/latest/download/latest.json"
         ],
-        "pubkey": "",
+        "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY4MzA0MzI2RDZBMzQ5NEEKUldSS1NhUFdKa013YUUrU2RuQnRIS3F1djBxemVmYkpyZ2thRVIreDQ5dEM3V3dFSVBwRnhkcTYK",
         "windows": {
           "installMode": "passive"
         }
