@@ -149,6 +149,7 @@ export function MultiPaneChart({
       layout: {
         background: { color: 'transparent' },
         textColor: '#9ca3af',
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: '#1f2937' },
@@ -334,6 +335,12 @@ export function MultiPaneChart({
       tracked.push({ series: rsiSeries, label: 'RSI', color: '#a855f7', pane: nextPane })
       nextPane++
     }
+
+    // Fit time scale to data so candles fill the full chart width.
+    // Without this, lightweight-charts may show only the visible range's
+    // most-recent portion when the data range is wider than the visible
+    // window (e.g. switching from 6mo to 1yr leaves a gap on the right).
+    chart.timeScale().fitContent()
 
     const panes = chart.panes()
     if (panes.length > 0) {
