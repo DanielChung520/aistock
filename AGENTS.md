@@ -119,6 +119,10 @@ python -m compileall src/
 cd frontend && docker compose up -d
 ```
 
+> **架構備註**：ArangoDB 是 host-level 共用 infra（`arangodb` container，port 8529），多業務以 `_db/<business>` 隔離。
+> 本專案 DB 名為 **`aistock`**。完整規範與新業務 DB 建立流程：[`DanielChung520/workspace-infra`](https://github.com/DanielChung520/workspace-infra)。
+> 目前 frontend 內的 docker-compose.yml 暫保留，待遷移至共用 instance。
+
 ---
 
 ## Code Style — TypeScript / JavaScript
