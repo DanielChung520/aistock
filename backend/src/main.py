@@ -7,12 +7,22 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.db import ensure_collection, ensure_database, get_db
+from src.data_fetcher import DAILY_COLLECTION, MINUTE_COLLECTION, VP_COLLECTION
+from src.scheduler import start_scheduler, stop_scheduler
 from src.routers.auction import router as auction_router
+from src.routers.backtest import router as backtest_router
+from src.routers.bars import router as bars_router
 from src.routers.basics import router as basics_router
 from src.routers.market import router as market_router
+from src.routers.schedule import router as schedule_router
 from src.routers.stocks import router as stocks_router
+from src.routers.strategy import router as strategy_router
+from src.routers.strategy_hits import router as strategy_hits_router
 from src.routers.watchlist import router as watchlist_router
 from src.routers.news import router as news_router
+from src.routers.patterns import router as patterns_router
+from src.routers.features import router as features_router
+from src.routers.ai_training import router as ai_training_router
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +78,25 @@ async def lifespan(_: FastAPI):
     ensure_database()
     ensure_collection("stock_codes")
     ensure_collection("watchlist")
+    ensure_collection(DAILY_COLLECTION)
+    ensure_collection(MINUTE_COLLECTION)
+    ensure_collection(VP_COLLECTION)
+    ensure_collection("watchlist_jobs")
+    ensure_collection("search_patterns")
+    ensure_collection("stock_daily_features")
+    ensure_collection("feature_jobs")
+    ensure_collection("ai_training_jobs")
+    ensure_collection("model_artifacts")
+    ensure_collection("strategy_hits")
+    hits_col = get_db().collection("strategy_hits")
+    existing = {tuple(i.get("fields", [])) for i in hits_col.indexes()}
+    for fields in (["read"], ["scan_at"]):
+        if tuple(fields) not in existing:
+            hits_col.add_index({"type": "persistent", "fields": fields})
     _seed_stock_codes_if_empty()
+    start_scheduler()
     yield
+    stop_scheduler()
 
 
 app = FastAPI(title="aiStock Backend", lifespan=lifespan)
@@ -89,8 +116,16 @@ def health() -> dict[str, str]:
 
 
 app.include_router(stocks_router, prefix="/api")
+app.include_router(bars_router, prefix="/api")
+app.include_router(schedule_router, prefix="/api")
 app.include_router(news_router, prefix="/api")
 app.include_router(watchlist_router, prefix="/api")
 app.include_router(market_router, prefix="/api")
 app.include_router(basics_router, prefix="/api")
 app.include_router(auction_router, prefix="/api")
+app.include_router(backtest_router, prefix="/api")
+app.include_router(strategy_router, prefix="/api")
+app.include_router(strategy_hits_router, prefix="/api")
+app.include_router(patterns_router, prefix="/api")
+app.include_router(features_router, prefix="/api")
+app.include_router(ai_training_router, prefix="/api")
