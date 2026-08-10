@@ -22,6 +22,8 @@ export type CacheCategory =
   | 'menu'                // 選單
   | 'watchlist'           // 自選股（即時）
   | 'search'              // 搜尋結果
+  | 'strategy-hits'       // 策略選股命中歷史
+  | 'strategy-unread-count' // 通知中心未讀數
 
 const TTL_MS: Record<CacheCategory, number> = {
   'taiex-quote':            5 * 60 * 1000,            // 5 分鐘
@@ -38,6 +40,8 @@ const TTL_MS: Record<CacheCategory, number> = {
   'menu':                    24 * 60 * 60 * 1000,      // 24 小時
   'watchlist':               0,                          // 不快取
   'search':                  30 * 60 * 1000,            // 30 分鐘
+  'strategy-hits':           5 * 60 * 1000,             // 5 分鐘
+  'strategy-unread-count':   30 * 1000,                 // 30 秒
 }
 
 export function ttlFor(category: CacheCategory): number {
