@@ -12,44 +12,13 @@ import {
 } from "@/components/ui/select";
 import { useStrategyDrawer } from "@/lib/strategy-drawer-context";
 import { cn } from "@/lib/utils";
-import { StrategyScreener } from "@/components/strategy-screener";
+import {
+  ScreenResponse,
+  StrategyScreener,
+} from "@/components/strategy-screener";
 
-// strategy-screener.tsx 未匯出這些型別，此處本地定義（Wave 2B 加上正式 props 後對齊）
-interface ScreenResult {
-  stock_id: string;
-  name?: string | null;
-  price: number | null;
-  score: number;
-  date: string;
-  passed: boolean;
-  passed_count: number;
-  total_conditions: number;
-}
-
-interface ScreenResponse {
-  total: number;
-  scanned: number;
-  results: ScreenResult[];
-  conditions: Array<{
-    metric: string;
-    op: string;
-    value: number | string | null;
-    note: string;
-  }>;
-}
-
-interface StrategyScreenerSlotProps {
-  scope: string;
-  onHit: (response: ScreenResponse, source: "manual" | "ai") => void;
-}
-
-// Wave 2B（commit 7）會把 scope/onHit props 直接加到 StrategyScreener，
-// 屆時移除這個 slot 改為直接傳遞；在此之前保持 drawer 可獨立編譯。
-function StrategyScreenerSlot({ scope, onHit }: StrategyScreenerSlotProps) {
-  void scope;
-  void onHit;
-  return <StrategyScreener />;
-}
+// Select 只會產生這三種值（全部 / 關注股 / sector:*），縮窄後傳給 StrategyScreener 的 ScopeType prop
+type DrawerScope = "all" | "watchlist" | `sector:${string}`;
 
 export function StrategyDrawer() {
   const { isOpen, close } = useStrategyDrawer();
@@ -151,7 +120,10 @@ export function StrategyDrawer() {
         </header>
         <div className="flex-1 overflow-hidden flex flex-col">
           <div className="flex-1 overflow-y-auto">
-            <StrategyScreenerSlot scope={scope} onHit={persistHits} />
+            <StrategyScreener
+              scope={scope as DrawerScope}
+              onHit={persistHits}
+            />
           </div>
         </div>
       </aside>

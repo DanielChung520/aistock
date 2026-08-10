@@ -9,15 +9,23 @@ import { RightSidebar } from '@/components/right-sidebar'
 import { Footer } from '@/components/footer'
 import { AIChatModal } from '@/components/ai-chat-modal'
 import { MyStocksDrawer } from '@/components/my-stocks-drawer'
+import { StrategyDrawer } from '@/components/strategy-drawer'
+import { NotificationsDrawer } from '@/components/notifications-drawer'
 import { WatchlistModal } from '@/components/watchlist-modal'
 import { WatchlistModalProvider } from '@/lib/watchlist-modal-context'
+import { StrategyDrawerProvider } from '@/lib/strategy-drawer-context'
+import { NotificationsDrawerProvider } from '@/lib/notifications-drawer-context'
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 
 export function AppShell({ children, title }: { children: React.ReactNode; title?: string }) {
   return (
-    <WatchlistModalProvider>
-      <AppShellInner title={title}>{children}</AppShellInner>
-    </WatchlistModalProvider>
+    <StrategyDrawerProvider>
+      <NotificationsDrawerProvider>
+        <WatchlistModalProvider>
+          <AppShellInner title={title}>{children}</AppShellInner>
+        </WatchlistModalProvider>
+      </NotificationsDrawerProvider>
+    </StrategyDrawerProvider>
   )
 }
 
@@ -60,6 +68,8 @@ function AppShellInner({ children, title }: { children: React.ReactNode; title?:
       </div>
 
       <MyStocksDrawer />
+      <StrategyDrawer />
+      <NotificationsDrawer />
       <AIChatModal />
       <WatchlistModal />
     </div>
