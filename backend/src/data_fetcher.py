@@ -19,7 +19,7 @@ def fetch_daily_history(
     months: int = 6,
 ) -> list[dict]:
     ticker = yf.Ticker(_twse_symbol(symbol))
-    end = date.today()
+    end = date.today() + timedelta(days=1)
     start = end - timedelta(days=months * 35)
     hist = ticker.history(start=start.isoformat(), end=end.isoformat())
     if hist.empty:
