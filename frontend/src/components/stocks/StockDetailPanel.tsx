@@ -289,11 +289,9 @@ export function StockDetailPanel({
 
       {!loading && !error && history && latestItem && (
         <>
-          <StockSummaryCard
-            stockId={symbol}
-            name={stockName}
+<StockSummaryCard
             close={latestItem.close}
-            change={latestItem.change}
+            change={prevItem ? latestItem.close - prevItem.close : 0}
             changePercent={changePercent}
             open={latestItem.open}
             high={latestItem.high}

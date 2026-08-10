@@ -3,8 +3,6 @@ import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface StockSummaryCardProps {
-  stockId: string;
-  name: string;
   close: number;
   change: number;
   changePercent: number;
@@ -16,8 +14,6 @@ export interface StockSummaryCardProps {
 }
 
 export function StockSummaryCard({
-  stockId,
-  name,
   close,
   change,
   changePercent,
@@ -41,11 +37,6 @@ export function StockSummaryCard({
   return (
     <div className={cn('w-full flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-4 px-4 py-3 md:py-2 rounded-lg border border-border bg-card', className)}>
       <div className="flex flex-row md:items-center justify-between w-full md:w-auto gap-4">
-        <div className="flex items-center gap-1.5 shrink-0 hidden md:flex">
-          <span className="font-bold text-sm">{name}</span>
-          <span className="text-muted-foreground text-xs">{stockId}</span>
-        </div>
-
         <div className="flex items-center gap-2 shrink-0">
           <span className={cn('text-xl font-bold', colorClass)}>{close.toFixed(2)}</span>
           <div className={cn('flex items-center text-sm font-semibold', colorClass)}>
