@@ -48,6 +48,7 @@ export function PatternSearchPanel({ initialPatternId }: PatternSearchPanelProps
   const [useAiSummary, setUseAiSummary] = useState(false)
   const [renamingKey, setRenamingKey] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const [endDateOverride, setEndDateOverride] = useState<string | null>(null)
 
   const loadPatterns = useCallback(async () => {
     try {
@@ -74,6 +75,7 @@ export function PatternSearchPanel({ initialPatternId }: PatternSearchPanelProps
   const selectPattern = (p: SearchPattern) => {
     setSelectedKey(p._key)
     setDraftParams(p.params)
+    setEndDateOverride(p.end_date ?? null)
     setResult(null)
     setSearchError(null)
   }
@@ -148,6 +150,7 @@ export function PatternSearchPanel({ initialPatternId }: PatternSearchPanelProps
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ai_summary: useAiSummary,
+          end_date: endDateOverride,
           llm: {
             base_url: sysSettings.llm.baseUrl,
             model: sysSettings.llm.model,
@@ -282,7 +285,7 @@ export function PatternSearchPanel({ initialPatternId }: PatternSearchPanelProps
                       {p.ai_description ?? '—'}
                     </div>
                     <div className="text-[10px] text-muted-foreground truncate">
-                      {p.symbol} · {p.bars.length} 根 · {new Date(p.created_at * 1000).toLocaleDateString('zh-TW')}
+                      {p.symbol} · {p.bars.length} 根 · {new Date(p.created_at).toLocaleDateString('zh-TW')}
                     </div>
                   </div>
                 </div>
@@ -393,6 +396,19 @@ export function PatternSearchPanel({ initialPatternId }: PatternSearchPanelProps
                           className="h-7 text-xs"
                         />
                       </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">
+                          錨定日期（清空 = 用 pattern 預設）
+                        </Label>
+                        <Input
+                          type="date"
+                          value={endDateOverride ?? ''}
+                          onChange={(e) =>
+                            setEndDateOverride(e.target.value === '' ? null : e.target.value)
+                          }
+                          className="h-7 text-xs"
+                        />
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
@@ -461,7 +477,7 @@ export function PatternSearchPanel({ initialPatternId }: PatternSearchPanelProps
                   <div className="text-[11px] text-muted-foreground space-y-0.5">
                     <div className="font-mono">{selected.symbol}</div>
                     <div>樣本 {selected.bars.length} 根</div>
-                    <div>{new Date(selected.created_at * 1000).toLocaleDateString('zh-TW')}</div>
+                    <div>{new Date(selected.created_at).toLocaleDateString('zh-TW')}</div>
                   </div>
                   {selected.ai_description && (
                     <div className="text-[11px] text-foreground/80 border-t border-border pt-2 leading-snug">

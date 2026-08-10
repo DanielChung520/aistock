@@ -50,7 +50,7 @@ async function buildDefaultPatternName(): Promise<string> {
       const todayYmd = ymd
       const count = list.filter((p) => {
         try {
-          const d = new Date(p.created_at * 1000)
+          const d = new Date(p.created_at)
           const dParts = fmt.formatToParts(d)
           const dYmd = `${dParts.find((x) => x.type === 'year')?.value ?? ''}${dParts.find((x) => x.type === 'month')?.value ?? ''}${dParts.find((x) => x.type === 'day')?.value ?? ''}`
           return dYmd === todayYmd
@@ -180,6 +180,7 @@ export function StockDetailPanel({
           name: patternName.trim(),
           symbol,
           bars: patternSelection.closes,
+          end_date: patternSelection.dates[patternSelection.dates.length - 1] ?? null,
           thumbnail: patternSelection.thumbnail ?? null,
           params: DEFAULT_PATTERN_PARAMS,
           ai_summary: true,
