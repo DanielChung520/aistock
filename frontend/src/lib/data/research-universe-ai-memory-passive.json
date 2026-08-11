@@ -1,0 +1,505 @@
+{
+  "description": "AI / 記憶體 / 被動元件研究 universe（ML 投資組合 Layer 3 候選股）",
+  "version": 1,
+  "created_at": "2026-08-08",
+  "stocks": [
+    {
+      "stock_id": "2330",
+      "name": "台積電",
+      "tags": [
+        "ai_chip",
+        "semiconductor"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "2454",
+      "name": "聯發科",
+      "tags": [
+        "ai_chip",
+        "semiconductor"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "3661",
+      "name": "世芯-KY",
+      "tags": [
+        "ai_chip",
+        "semiconductor"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "3443",
+      "name": "創意",
+      "tags": [
+        "ai_chip",
+        "semiconductor"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "3035",
+      "name": "智原",
+      "tags": [
+        "ai_chip",
+        "semiconductor"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "6531",
+      "name": "愛普",
+      "tags": [
+        "ai_chip",
+        "memory"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "5351",
+      "name": "鈺創",
+      "tags": [
+        "ai_chip",
+        "memory"
+      ],
+      "market": "上櫃"
+    },
+    {
+      "stock_id": "6770",
+      "name": "力積電",
+      "tags": [
+        "ai_chip",
+        "memory"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "3711",
+      "name": "日月光",
+      "tags": [
+        "ai_chip",
+        "packaging"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "6239",
+      "name": "力成",
+      "tags": [
+        "ai_chip",
+        "packaging"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "6515",
+      "name": "穎崴",
+      "tags": [
+        "ai_chip",
+        "testing"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "6223",
+      "name": "旺矽",
+      "tags": [
+        "ai_chip",
+        "testing"
+      ],
+      "market": "上櫃"
+    },
+    {
+      "stock_id": "2317",
+      "name": "鴻海",
+      "tags": [
+        "ai_server"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "2382",
+      "name": "廣達",
+      "tags": [
+        "ai_server"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "3231",
+      "name": "緯創",
+      "tags": [
+        "ai_server"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "2356",
+      "name": "英業達",
+      "tags": [
+        "ai_server"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "3706",
+      "name": "神達",
+      "tags": [
+        "ai_server"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "6669",
+      "name": "緯穎",
+      "tags": [
+        "ai_server"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "2376",
+      "name": "技嘉",
+      "tags": [
+        "ai_server"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "3017",
+      "name": "奇鋐",
+      "tags": [
+        "ai_thermal"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "3324",
+      "name": "雙鴻",
+      "tags": [
+        "ai_thermal"
+      ],
+      "market": "上櫃"
+    },
+    {
+      "stock_id": "2421",
+      "name": "建準",
+      "tags": [
+        "ai_thermal"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "2308",
+      "name": "台達電",
+      "tags": [
+        "ai_power"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "2301",
+      "name": "光寶科",
+      "tags": [
+        "ai_power"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "6412",
+      "name": "群電",
+      "tags": [
+        "ai_power"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "3037",
+      "name": "欣興",
+      "tags": [
+        "ai_pcb"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "2313",
+      "name": "華通",
+      "tags": [
+        "ai_pcb"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "8046",
+      "name": "南亞電",
+      "tags": [
+        "ai_pcb"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "2368",
+      "name": "金像電",
+      "tags": [
+        "ai_pcb"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "3044",
+      "name": "健鼎",
+      "tags": [
+        "ai_pcb"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "3533",
+      "name": "嘉澤",
+      "tags": [
+        "ai_connector"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "3217",
+      "name": "優群",
+      "tags": [
+        "ai_connector"
+      ],
+      "market": "上櫃"
+    },
+    {
+      "stock_id": "2392",
+      "name": "正崴",
+      "tags": [
+        "ai_connector"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "6231",
+      "name": "系微",
+      "tags": [
+        "ai_software"
+      ],
+      "market": "上櫃"
+    },
+    {
+      "stock_id": "5203",
+      "name": "訊連",
+      "tags": [
+        "ai_software"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "6811",
+      "name": "宏碁資訊",
+      "tags": [
+        "ai_software"
+      ],
+      "market": "上櫃"
+    },
+    {
+      "stock_id": "2344",
+      "name": "華邦電",
+      "tags": [
+        "memory",
+        "dram"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "2408",
+      "name": "南亞科",
+      "tags": [
+        "memory",
+        "dram"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "3006",
+      "name": "晶豪科",
+      "tags": [
+        "memory",
+        "dram"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "2337",
+      "name": "旺宏",
+      "tags": [
+        "memory",
+        "nand_flash"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "8299",
+      "name": "群聯",
+      "tags": [
+        "memory",
+        "nand_flash"
+      ],
+      "market": "上櫃"
+    },
+    {
+      "stock_id": "8110",
+      "name": "華東",
+      "tags": [
+        "memory",
+        "nand_flash"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "3260",
+      "name": "威剛",
+      "tags": [
+        "memory",
+        "module"
+      ],
+      "market": "上櫃"
+    },
+    {
+      "stock_id": "4967",
+      "name": "十銓",
+      "tags": [
+        "memory",
+        "module"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "8271",
+      "name": "宇瞻",
+      "tags": [
+        "memory",
+        "module"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "2451",
+      "name": "創見",
+      "tags": [
+        "memory",
+        "module"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "8088",
+      "name": "品安",
+      "tags": [
+        "memory",
+        "module"
+      ],
+      "market": "上櫃"
+    },
+    {
+      "stock_id": "2327",
+      "name": "國巨",
+      "tags": [
+        "passive",
+        "mlcc"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "2492",
+      "name": "華新科",
+      "tags": [
+        "passive",
+        "mlcc"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "3026",
+      "name": "禾伸堂",
+      "tags": [
+        "passive",
+        "mlcc"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "6173",
+      "name": "信昌電",
+      "tags": [
+        "passive",
+        "mlcc"
+      ],
+      "market": "上櫃"
+    },
+    {
+      "stock_id": "6284",
+      "name": "佳邦",
+      "tags": [
+        "passive",
+        "capacitor"
+      ],
+      "market": "上櫃"
+    },
+    {
+      "stock_id": "2472",
+      "name": "立隆電",
+      "tags": [
+        "passive",
+        "capacitor"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "2478",
+      "name": "大毅",
+      "tags": [
+        "passive",
+        "resistor"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "2107",
+      "name": "厚生",
+      "tags": [
+        "passive",
+        "resistor"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "8121",
+      "name": "越峰",
+      "tags": [
+        "passive",
+        "inductor"
+      ],
+      "market": "上櫃"
+    },
+    {
+      "stock_id": "3042",
+      "name": "晶技",
+      "tags": [
+        "passive",
+        "crystal"
+      ],
+      "market": "上市"
+    },
+    {
+      "stock_id": "2484",
+      "name": "希華",
+      "tags": [
+        "passive",
+        "crystal"
+      ],
+      "market": "上市"
+    }
+  ]
+}
