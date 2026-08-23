@@ -7,7 +7,6 @@ import { AppShell } from '@/components/app-shell'
 import { Toaster } from '@/components/ui/sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -83,14 +82,27 @@ export default function TXRLEnvironmentPage() {
 
   const onStart = async () => {
     setSubmitting(true)
-    // TODO: 接 backend POST /api/tx-rl/train
-    toast.info('目前使用 mock — backend API 尚未實作', {
-      description: 'SPEC 0.1 審查中。確認後再實作 Celery training。',
-    })
-    setTimeout(() => {
-      setSubmitting(false)
+    try {
+      const r = await fetch('/api/tx-rl/train', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config }),
+      })
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}))
+        throw new Error(err.detail ?? `HTTP ${r.status}`)
+      }
+      const { job_id } = await r.json()
+      sessionStorage.setItem('tx_rl_job_id', job_id)
+      sessionStorage.setItem('tx_rl_config', JSON.stringify(config))
+      toast.success('訓練已啟動', { description: `Job ID: ${job_id.slice(0, 12)}…` })
       router.push('/tx-rl/training')
-    }, 600)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      toast.error('啟動訓練失敗', { description: msg })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (

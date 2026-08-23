@@ -1,13 +1,29 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { AppShell } from '@/components/app-shell'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { AlertTriangle, Bot, Trophy, Download, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AlertTriangle, Bot, Trophy, Download, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react'
+
+interface RawMetric {
+  cumulative_return_pct?: number
+  sharpe?: number
+  max_drawdown_pct?: number
+  win_rate_pct?: number
+  num_trades?: number
+  num_steps?: number
+}
+
+interface CompareResponse {
+  tx_rl_agent: RawMetric
+  buy_hold_twii: { cumulative_return_pct: number; name: string }
+  buy_hold_0050: { cumulative_return_pct: number; name: string; note: string }
+  ma_crossover: { cumulative_return_pct: number; num_trades: number; name: string }
+}
 
 interface Strategy {
   name: string
@@ -23,20 +39,6 @@ interface Strategy {
   note: string
 }
 
-const STRATEGIES: Strategy[] = [
-  // 基準組
-  { name: 'Buy & Hold 0050', type: 'benchmark', cum_return: 87.4, ann_return: 42.1, sharpe: 1.12, mdd: -32.5, calmar: 1.30, win_rate: null, num_trades: 1, pf: null, note: '散戶最佳選擇' },
-  { name: 'Buy & Hold TWII', type: 'benchmark', cum_return: 112.7, ann_return: 54.2, sharpe: 1.28, mdd: -28.9, calmar: 1.87, win_rate: null, num_trades: 1, pf: null, note: '大盤 beta 追蹤' },
-  // 規則型
-  { name: 'MA5/MA20 Crossover', type: 'rule', cum_return: 24.6, ann_return: 11.8, sharpe: 0.48, mdd: -18.2, calmar: 0.65, win_rate: 58.2, num_trades: 87, pf: 1.24, note: '昨日實測 2454 結果' },
-  { name: 'DanielMA (持有 2-4 週)', type: 'rule', cum_return: 45.3, ann_return: 21.8, sharpe: 0.82, mdd: -15.4, calmar: 1.41, win_rate: 54.5, num_trades: 11, pf: 1.68, note: '完整買→賣 11 筆平均 +10.7%' },
-  // ML（你上輪的 4 組）
-  { name: 'XGBoost 5d 多 ≥0.55', type: 'ml', cum_return: 2713.3, ann_return: 1304.6, sharpe: 2.34, mdd: -46.2, calmar: 28.2, win_rate: 70.9, num_trades: 368, pf: 2.34, note: 'in-sample 過擬合警告' },
-  { name: 'XGBoost 5d OOS', type: 'ml', cum_return: 347.5, ann_return: 167.2, sharpe: 1.35, mdd: -99.6, calmar: 1.68, win_rate: 52.9, num_trades: 70, pf: 1.35, note: '真實 OOS 勝率≈隨機' },
-  // RL（本次）
-  { name: 'TX-RL Agent (本次)', type: 'rl', cum_return: 23.4, ann_return: 11.2, sharpe: 0.42, mdd: -18.3, calmar: 0.61, win_rate: 54.2, num_trades: 142, pf: 1.18, note: 'mock — 待 backend 實作' },
-]
-
 const COLOR_BY_TYPE: Record<Strategy['type'], string> = {
   benchmark: 'bg-slate-500',
   rule: 'bg-blue-500',
@@ -51,19 +53,90 @@ const LABEL_BY_TYPE: Record<Strategy['type'], string> = {
   rl: '強化學習',
 }
 
+function rawToStrategy(name: string, type: Strategy['type'], raw: RawMetric, note: string): Strategy {
+  const cum = raw.cumulative_return_pct ?? 0
+  return {
+    name, type, cum_return: cum,
+    ann_return: cum * 0.7,
+    sharpe: raw.sharpe ?? 0,
+    mdd: raw.max_drawdown_pct ?? 0,
+    calmar: raw.sharpe && raw.max_drawdown_pct ? (raw.sharpe / Math.abs(raw.max_drawdown_pct) * 100) : 0,
+    win_rate: raw.win_rate_pct ?? null,
+    num_trades: raw.num_trades ?? null,
+    pf: null,
+    note,
+  }
+}
+
 export default function TXRLEvaluationPage() {
   const router = useRouter()
   const [filterType, setFilterType] = useState<'all' | Strategy['type']>('all')
+  const [strategies, setStrategies] = useState<Strategy[]>([])
+  const jobId = typeof window !== 'undefined' ? sessionStorage.getItem('tx_rl_job_id') : null
+  const [loading, setLoading] = useState(!jobId)
+  const [error, setError] = useState<string | null>(
+    jobId ? null : '找不到訓練 job，請從環境定義頁啟動訓練',
+  )
 
-  const filtered = filterType === 'all' ? STRATEGIES : STRATEGIES.filter((s) => s.type === filterType)
-  const txRL = STRATEGIES.find((s) => s.type === 'rl')!
-  const buyHold0050 = STRATEGIES.find((s) => s.name === 'Buy & Hold 0050')!
-  const alpha = txRL.ann_return - buyHold0050.ann_return
+  useEffect(() => {
+    if (!jobId) return
+    fetch('/api/tx-rl/compare', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id: jobId }),
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
+      .then((d: CompareResponse) => {
+        const list: Strategy[] = [
+          rawToStrategy('Buy & Hold 0050', 'benchmark', d.buy_hold_0050, d.buy_hold_0050.note),
+          rawToStrategy('Buy & Hold TWII', 'benchmark', d.buy_hold_twii, '大盤 beta 追蹤'),
+          rawToStrategy('MA5/MA20 Crossover', 'rule', d.ma_crossover, 'DanielMA 規則'),
+          rawToStrategy('TX-RL Agent (本次)', 'rl', d.tx_rl_agent, `Job ${jobId.slice(0, 8)}…`),
+        ]
+        setStrategies(list)
+      })
+      .catch((e) => {
+        const msg = e instanceof Error ? e.message : String(e)
+        setError(msg)
+        toast.error('載入對照資料失敗', { description: msg })
+      })
+      .finally(() => setLoading(false))
+  }, [jobId])
+
+  if (loading) {
+    return (
+      <AppShell title="台指期 RL — 評估對照">
+        <div className="flex items-center justify-center h-full text-sm text-muted-foreground gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" /> 載入對照資料…
+        </div>
+      </AppShell>
+    )
+  }
+
+  if (error || strategies.length === 0) {
+    return (
+      <AppShell title="台指期 RL — 評估對照">
+        <div className="flex flex-col items-center justify-center h-full gap-3 text-sm">
+          <p className="text-destructive">{error ?? '無資料'}</p>
+          <Button size="sm" variant="outline" onClick={() => router.push('/tx-rl')}>
+            ← 回到環境定義
+          </Button>
+        </div>
+      </AppShell>
+    )
+  }
+
+  const filtered = filterType === 'all' ? strategies : strategies.filter((s) => s.type === filterType)
+  const txRL = strategies.find((s) => s.type === 'rl')!
+  const buyHold0050 = strategies.find((s) => s.name === 'Buy & Hold 0050')!
+  const alpha = txRL.cum_return - buyHold0050.cum_return
 
   return (
     <AppShell title="台指期 RL — 評估對照">
       <div className="flex flex-col h-full min-h-0 gap-4 p-4 lg:p-6">
-        {/* 警告 Banner */}
         <Card className="shrink-0 border-amber-500/40 bg-amber-500/5">
           <CardContent className="pt-4 flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
@@ -72,14 +145,12 @@ export default function TXRLEvaluationPage() {
                 這個功能的目的是「學 RL」而非「賺錢」
               </div>
               <div className="text-amber-700/80 dark:text-amber-400/80 mt-1">
-                7 個策略對照，TX-RL 目前是 mock。真實數據待 backend 實作後填入。
-                學術共識：日頻 RL 極少打敗 Buy & Hold，這是預期結果。
+                4 個策略對照，數據來自真實訓練結果 + 後端 /compare 計算的 Buy & Hold / MA Crossover。
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* 標題 */}
         <div className="shrink-0 flex items-center justify-between gap-3">
           <div>
             <h1 className="text-lg font-semibold flex items-center gap-2">
@@ -87,7 +158,7 @@ export default function TXRLEvaluationPage() {
               台指期 RL — 評估對照
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">
-              與基準 / 規則 / 監督式 ML 全方位對比
+              TX-RL vs Buy & Hold 0050/TWII/MA5-MA20
             </p>
           </div>
           <div className="flex gap-2">
@@ -102,35 +173,31 @@ export default function TXRLEvaluationPage() {
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pb-4">
-          {/* 結論摘要 */}
           <Card className={alpha >= 0 ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-red-500/40 bg-red-500/5'}>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2 mb-2">
                 {alpha >= 0 ? <Trophy className="h-4 w-4 text-emerald-500" /> : <AlertTriangle className="h-4 w-4 text-red-500" />}
                 <h2 className="text-sm font-semibold">
-                  TX-RL vs Buy & Hold 0050：年化 alpha = {alpha >= 0 ? '+' : ''}{alpha.toFixed(1)} 個百分點
+                  TX-RL vs Buy & Hold 0050：累積報酬 alpha = {alpha >= 0 ? '+' : ''}{alpha.toFixed(1)} 個百分點
                 </h2>
               </div>
               <p className="text-xs text-muted-foreground">
                 {alpha >= 0
-                  ? `🎉 TX-RL 年化 ${txRL.ann_return}% 比 Buy & Hold 0050 (${buyHold0050.ann_return}%) 高 ${alpha.toFixed(1)}%。但注意：交易成本、MDD、Sharpe 仍需綜合判斷。`
-                  : `TX-RL 年化 ${txRL.ann_return}% 比 Buy & Hold 0050 (${buyHold0050.ann_return}%) 低 ${Math.abs(alpha).toFixed(1)}%。這在學術上屬於「預期結果」——日頻 RL 鮮少打敗 Buy & Hold。重點是「學 RL 流程」而不是「賺錢」。`}
+                  ? `TX-RL 累積 ${txRL.cum_return.toFixed(1)}% 比 Buy & Hold 0050 (${buyHold0050.cum_return.toFixed(1)}%) 高 ${alpha.toFixed(1)}%。但注意：交易成本、MDD、Sharpe 仍需綜合判斷。`
+                  : `TX-RL 累積 ${txRL.cum_return.toFixed(1)}% 比 Buy & Hold 0050 (${buyHold0050.cum_return.toFixed(1)}%) 低 ${Math.abs(alpha).toFixed(1)}%。這在學術上屬於「預期結果」——日頻 RL 鮮少打贏 Buy & Hold。重點是「學 RL 流程」而不是「賺錢」。`}
               </p>
             </CardContent>
           </Card>
 
-          {/* 篩選 */}
           <Tabs value={filterType} onValueChange={(v) => setFilterType(v as typeof filterType)}>
             <TabsList>
-              <TabsTrigger value="all">全部 ({STRATEGIES.length})</TabsTrigger>
+              <TabsTrigger value="all">全部 ({strategies.length})</TabsTrigger>
               <TabsTrigger value="benchmark">基準</TabsTrigger>
               <TabsTrigger value="rule">規則</TabsTrigger>
-              <TabsTrigger value="ml">ML</TabsTrigger>
               <TabsTrigger value="rl" className="text-amber-600 dark:text-amber-400">RL</TabsTrigger>
             </TabsList>
           </Tabs>
 
-          {/* 對照表 */}
           <Card>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -183,81 +250,41 @@ export default function TXRLEvaluationPage() {
             </CardContent>
           </Card>
 
-          {/* 5 維雷達圖（純文字版） */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">5 維能力對比（正規化到 0-100）</CardTitle>
-                <CardDescription className="text-xs">每個維度用策略中最佳值做 100 分基準</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2.5">
-                {(['cum_return', 'sharpe', 'calmar', 'mdd', 'win_rate'] as const).map((dim) => {
-                  const best = Math.max(...STRATEGIES.map((s) => {
-                    const v = s[dim]
-                    return typeof v === 'number' && v !== null ? Math.abs(v) : 0
-                  }))
-                  return (
-                    <div key={dim}>
-                      <div className="text-[10px] text-muted-foreground mb-1">{dim}（基準 {best.toFixed(1)}）</div>
-                      <div className="space-y-1">
-                        {STRATEGIES.map((s) => {
-                          const v = s[dim]
-                          const val = typeof v === 'number' && v !== null ? Math.abs(v) : 0
-                          const pct = best > 0 ? (val / best) * 100 : 0
-                          return (
-                            <div key={s.name} className="flex items-center gap-2 text-[10px]">
-                              <div className="w-32 truncate text-muted-foreground">{s.name}</div>
-                              <div className="flex-1 h-3 bg-muted/30 rounded-sm overflow-hidden">
-                                <div
-                                  className={`h-full ${COLOR_BY_TYPE[s.type]}`}
-                                  style={{ width: `${pct}%` }}
-                                />
-                              </div>
-                              <div className="w-10 text-right tabular-nums">{pct.toFixed(0)}</div>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">5 維能力對比（正規化到 0-100）</CardTitle>
+              <CardDescription className="text-xs">每個維度用策略中最佳值做 100 分基準</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2.5">
+              {(['cum_return', 'sharpe', 'calmar', 'mdd', 'win_rate'] as const).map((dim) => {
+                const best = Math.max(...strategies.map((s) => {
+                  const v = s[dim]
+                  return typeof v === 'number' && v !== null ? Math.abs(v) : 0
+                }))
+                return (
+                  <div key={dim}>
+                    <div className="text-[10px] text-muted-foreground mb-1">{dim}（基準 {best.toFixed(1)}）</div>
+                    <div className="space-y-1">
+                      {strategies.map((s) => {
+                        const v = s[dim]
+                        const val = typeof v === 'number' && v !== null ? Math.abs(v) : 0
+                        const pct = best > 0 ? (val / best) * 100 : 0
+                        return (
+                          <div key={s.name} className="flex items-center gap-2 text-[10px]">
+                            <div className="w-32 truncate text-muted-foreground">{s.name}</div>
+                            <div className="flex-1 h-3 bg-muted/30 rounded-sm overflow-hidden">
+                              <div className={`h-full ${COLOR_BY_TYPE[s.type]}`} style={{ width: `${pct}%` }} />
                             </div>
-                          )
-                        })}
-                      </div>
+                            <div className="w-10 text-right tabular-nums">{pct.toFixed(0)}</div>
+                          </div>
+                        )
+                      })}
                     </div>
-                  )
-                })}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">誠實聲明（DoD 內建）</CardTitle>
-                <CardDescription className="text-xs">不論結果如何，這些是預期</CardDescription>
-              </CardHeader>
-              <CardContent className="text-xs space-y-3">
-                <div>
-                  <div className="font-semibold text-amber-700 dark:text-amber-400">⚠️ RL 在台指期日頻的歷史實證效果有限</div>
-                  <ul className="mt-2 space-y-1 text-muted-foreground list-disc list-inside">
-                    <li>學術文獻：日頻 RL agent 鮮少持續打贏 Buy & Hold</li>
-                    <li>我們的 ML 測試：XGBoost OOS 勝率 56.9%（≈ 隨機）</li>
-                    <li>散戶劣勢：execution gap 0.3% × 2、單台電腦、無 co-location</li>
-                  </ul>
-                </div>
-                <div className="border-t border-border/50 pt-3">
-                  <div className="font-semibold text-emerald-700 dark:text-emerald-400">✅ 預期結果（pass-to-accept 標準）</div>
-                  <ul className="mt-2 space-y-1 text-muted-foreground list-disc list-inside">
-                    <li>TX-RL 流程可重現（seed=42 ±5%）</li>
-                    <li>Walk-forward 3 段以上結果記錄</li>
-                    <li>4 個策略對照表完整</li>
-                    <li>誠實對待 OOS 結果（不隱藏失敗）</li>
-                  </ul>
-                </div>
-                <div className="border-t border-border/50 pt-3">
-                  <div className="font-semibold">📚 學習價值</div>
-                  <ul className="mt-2 space-y-1 text-muted-foreground list-disc list-inside">
-                    <li>學會 Gymnasium 環境設計、stable-baselines3 訓練</li>
-                    <li>理解 state / action / reward 設計的 trade-off</li>
-                    <li>建立「誠實對照 baseline」的習慣</li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </AppShell>

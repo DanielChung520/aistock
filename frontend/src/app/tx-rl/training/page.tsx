@@ -13,20 +13,6 @@ import { AlertTriangle, Bot, Loader2, Check, StopCircle, Activity } from 'lucide
 
 type Status = 'idle' | 'running' | 'completed' | 'failed'
 
-const HISTORY_POINTS = 200
-const generateHistory = (until: number, finalReward: number) => {
-  const pts: { step: number; reward: number }[] = []
-  let cur = -0.05
-  for (let i = 0; i < until; i++) {
-    cur += (Math.random() - 0.45) * 0.01
-    if (i > until * 0.7) cur = cur * 0.9 + (finalReward / until) * i * 0.1
-    pts.push({ step: i, reward: cur })
-  }
-  return pts
-}
-
-const REWARD_HISTORY = generateHistory(2000, 0.08)
-
 export default function TXRLTrainingPage() {
   const router = useRouter()
   const [status, setStatus] = useState<Status>('idle')
@@ -41,28 +27,48 @@ export default function TXRLTrainingPage() {
     }
   }, [])
 
+  const jobId = typeof window !== 'undefined' ? sessionStorage.getItem('tx_rl_job_id') : null
+
+  useEffect(() => {
+    if (!jobId) return
+    let cancelled = false
+    const start = Date.now()
+    const tick = async () => {
+      if (cancelled) return
+      try {
+        const r = await fetch(`/api/tx-rl/jobs/${jobId}`)
+        if (r.ok) {
+          const d = await r.json()
+          setStatus(d.status as Status)
+          setCurrentStep(d.progress?.current_step ?? 0)
+          setElapsed(Math.floor((Date.now() - start) / 1000))
+          if (d.status === 'completed' || d.status === 'failed' || d.status === 'stopped') {
+            if (timerRef.current) clearInterval(timerRef.current)
+            if (d.status === 'completed') toast.success('訓練完成', { description: '可前往回測頁查看結果' })
+            if (d.status === 'failed') toast.error('訓練失敗', { description: d.error })
+            return
+          }
+        }
+      } catch { /* network blip — keep polling */ }
+    }
+    tick()  // immediate
+    timerRef.current = setInterval(tick, 2000)
+    return () => {
+      cancelled = true
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [jobId, totalSteps])
+
   const onStart = () => {
+    if (!jobId) {
+      toast.error('找不到訓練 job', { description: '請從環境定義頁啟動訓練' })
+      router.push('/tx-rl')
+      return
+    }
     setStatus('running')
     setCurrentStep(0)
     setElapsed(0)
-    toast.info('目前使用 mock — backend Celery 尚未實作', {
-      description: 'SPEC 0.1 審查中。確認後再接 Celery + stable-baselines3。',
-    })
-    const start = Date.now()
-    timerRef.current = setInterval(() => {
-      setCurrentStep((s) => {
-        const next = s + Math.floor(Math.random() * 800) + 200
-        if (next >= totalSteps) {
-          if (timerRef.current) clearInterval(timerRef.current)
-          setStatus('completed')
-          setElapsed(Math.floor((Date.now() - start) / 1000))
-          toast.success('訓練完成（mock）', { description: '可前往回測頁查看結果' })
-          return totalSteps
-        }
-        return next
-      })
-      setElapsed(Math.floor((Date.now() - start) / 1000))
-    }, 500)
+    toast.info('訓練監控中', { description: '每 2 秒 poll job 狀態' })
   }
 
   const onStop = () => {
@@ -157,20 +163,22 @@ export default function TXRLTrainingPage() {
               </CardContent>
             </Card>
 
-            {/* Reward 曲線（簡化 ASCII sparkline） */}
+            {/* 即時狀態摘要 */}
             <Card className="lg:col-span-2">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Reward 曲線（mock）</CardTitle>
+                <CardTitle className="text-sm">訓練進度</CardTitle>
                 <CardDescription className="text-xs">
-                  訓練過程中的 episode mean reward 變化
+                  {status === 'running' ? '訓練進行中，每 2 秒更新' : status === 'completed' ? '訓練已完成，可至回測頁看結果' : '等待啟動'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Sparkline data={REWARD_HISTORY} currentStep={currentStep} />
-                <div className="grid grid-cols-3 gap-3 mt-3 pt-3 border-t border-border/50">
-                  <Stat label="當前 reward" value={isCompleted ? '0.082' : isRunning ? '0.034' : '—'} />
-                  <Stat label="最高 reward" value="0.108" />
-                  <Stat label="最後 100ep 平均" value="0.071" />
+                <div className="grid grid-cols-3 gap-3">
+                  <Stat label="當前 Step" value={currentStep > 0 ? currentStep.toLocaleString() : '—'} />
+                  <Stat label="總步數" value={totalSteps.toLocaleString()} />
+                  <Stat label="耗時" value={elapsed > 0 ? `${elapsed}s` : '—'} />
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-3 pt-3 border-t border-border/50">
+                  演算法: PPO (預設) · Action: discrete_3 · Reward: pure_pnl · State features: 12 維
                 </div>
               </CardContent>
             </Card>
@@ -198,29 +206,6 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="rounded-md border bg-muted/30 px-3 py-2 text-center">
       <div className="text-[10px] text-muted-foreground">{label}</div>
       <div className="text-sm font-bold tabular-nums mt-0.5">{value}</div>
-    </div>
-  )
-}
-
-function Sparkline({ data, currentStep }: { data: { step: number; reward: number }[]; currentStep: number }) {
-  const w = 600; const h = 120; const pad = 8
-  const visible = data.filter((p) => p.step <= Math.max(currentStep, 1))
-  if (visible.length < 2) return <div className="h-32 flex items-center justify-center text-xs text-muted-foreground">等待資料…</div>
-  const minR = Math.min(...visible.map((p) => p.reward))
-  const maxR = Math.max(...visible.map((p) => p.reward))
-  const range = maxR - minR || 0.01
-  const pts = visible.map((p) => {
-    const x = pad + (p.step / data[data.length - 1].step) * (w - 2 * pad)
-    const y = h - pad - ((p.reward - minR) / range) * (h - 2 * pad)
-    return `${x},${y}`
-  }).join(' ')
-  return (
-    <div className="rounded border bg-muted/10 p-2">
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-32" preserveAspectRatio="none">
-        <polyline fill="none" stroke="#3b82f6" strokeWidth="1.5" points={pts} />
-        <text x={pad} y={pad + 10} fontSize="9" fill="#6b7280">min: {minR.toFixed(4)}</text>
-        <text x={pad} y={h - pad} fontSize="9" fill="#6b7280">max: {maxR.toFixed(4)}</text>
-      </svg>
     </div>
   )
 }
