@@ -23,6 +23,7 @@ from src.routers.news import router as news_router
 from src.routers.patterns import router as patterns_router
 from src.routers.features import router as features_router
 from src.routers.ai_training import router as ai_training_router
+from src.routers.tx_rl import router as tx_rl_router
 
 logger = logging.getLogger(__name__)
 
@@ -129,3 +130,4 @@ app.include_router(strategy_hits_router, prefix="/api")
 app.include_router(patterns_router, prefix="/api")
 app.include_router(features_router, prefix="/api")
 app.include_router(ai_training_router, prefix="/api")
+app.include_router(tx_rl_router, prefix="/api")
