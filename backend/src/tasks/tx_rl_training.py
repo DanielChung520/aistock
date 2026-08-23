@@ -142,6 +142,8 @@ def train_tx_rl_agent_task(self, job_id: str, config: dict) -> dict:
             "n_episodes": 1,
             "total_timesteps": total_timesteps,
         }
+        if not db.has_collection(MODELS_COLLECTION):
+            db.create_collection(MODELS_COLLECTION)
         db.collection(MODELS_COLLECTION).insert({
             "_key": job_id,
             "job_id": job_id,
