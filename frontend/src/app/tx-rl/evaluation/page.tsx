@@ -4,10 +4,16 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { AppShell } from '@/components/app-shell'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AlertTriangle, Bot, Trophy, Download, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react'
+import { WarningChart } from '@/components/tx-rl/WarningChart'
+import { BlockTitle } from '@/components/tx-rl/HelpButton'
+import {
+  EVAL_TABS_MD, EVAL_EQUITY_CURVE_MD, EVAL_DRAWDOWN_MD,
+  EVAL_TRADE_SCATTER_MD, EVAL_REWARD_CURVE_MD,
+} from '@/components/tx-rl/help-content'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ScatterChart, Scatter, ZAxis,
@@ -152,19 +158,7 @@ export default function TXRLEvaluationPage() {
   return (
     <AppShell title="台指期 RL — 評估對照">
       <div className="flex flex-col h-full min-h-0 gap-4 p-4 lg:p-6">
-        <Card className="shrink-0 border-amber-500/40 bg-amber-500/5">
-          <CardContent className="pt-4 flex items-start gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-            <div className="text-xs">
-              <div className="font-semibold text-amber-700 dark:text-amber-400">
-                這個功能的目的是「學 RL」而非「賺錢」
-              </div>
-              <div className="text-amber-700/80 dark:text-amber-400/80 mt-1">
-                4 個策略對照 + 4 個互動圖表。數據來自真實訓練結果 + 後端 /compare 計算的 Buy & Hold / MA Crossover。
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <WarningChart />
 
         <div className="shrink-0 flex items-center justify-between gap-3">
           <div>
@@ -321,7 +315,7 @@ function VisualizePanel({ raw }: { raw: CompareResponse }) {
     <div className="space-y-4">
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm">1. Equity Curve — 4 策略資金曲線對比</CardTitle>
+          <BlockTitle title="1. Equity Curve — 4 策略資金曲線對比" helpContent={EVAL_EQUITY_CURVE_MD} />
           <CardDescription className="text-xs">起點 = 1.0，hover 顯示當日詳細。終點差距 = alpha</CardDescription>
         </CardHeader>
         <CardContent>
@@ -342,7 +336,7 @@ function VisualizePanel({ raw }: { raw: CompareResponse }) {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm">2. Drawdown Timeline — 回撤隨時間變化</CardTitle>
+          <BlockTitle title="2. Drawdown Timeline — 回撤隨時間變化" helpContent={EVAL_DRAWDOWN_MD} />
           <CardDescription className="text-xs">負值越大代表從最高點跌越深。TX-RL 通常震盪最大（最不穩定）</CardDescription>
         </CardHeader>
         <CardContent>
@@ -363,7 +357,7 @@ function VisualizePanel({ raw }: { raw: CompareResponse }) {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm">3. TX-RL 進場點散佈</CardTitle>
+          <BlockTitle title="3. TX-RL 進場點散佈" helpContent={EVAL_TRADE_SCATTER_MD} />
           <CardDescription className="text-xs">每個點 = 一次進場。X 軸 = 進場日期，Y 軸 = 進場價。Buy=綠, Sell=紅</CardDescription>
         </CardHeader>
         <CardContent>
@@ -388,7 +382,7 @@ function VisualizePanel({ raw }: { raw: CompareResponse }) {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm">4. Reward 訓練曲線（PPO episode reward）</CardTitle>
+          <BlockTitle title="4. Reward 訓練曲線（PPO episode reward）" helpContent={EVAL_REWARD_CURVE_MD} />
           <CardDescription className="text-xs">每個點 = 一個 episode 的累計 reward。趨勢上升 = 學習中；震盪 = 已收斂或過擬合</CardDescription>
         </CardHeader>
         <CardContent>

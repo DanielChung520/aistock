@@ -5,12 +5,18 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { AppShell } from '@/components/app-shell'
 import { Toaster } from '@/components/ui/sonner'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { AlertTriangle, Bot, Database, Settings, Play, Sparkles } from 'lucide-react'
+import { Bot, Database, Settings, Play, Sparkles } from 'lucide-react'
+import { WarningChart } from '@/components/tx-rl/WarningChart'
+import { BlockTitle } from '@/components/tx-rl/HelpButton'
+import {
+  ACTION_SPACE_MD, REWARD_FUNCTION_MD, STATE_FEATURES_MD,
+  ALGORITHM_MD, DATA_RANGE_MD, WALK_FORWARD_MD,
+} from '@/components/tx-rl/help-content'
 
 type ActionMode = 'discrete_3' | 'discrete_5' | 'continuous'
 type RewardMode = 'pure_pnl' | 'sharpe' | 'multi_objective'
@@ -110,23 +116,8 @@ export default function TXRLEnvironmentPage() {
       <Toaster richColors position="top-center" />
       <AppShell title="台指期 RL">
         <div className="flex flex-col h-full min-h-0 gap-4 p-4 lg:p-6">
-          {/* 警告 Banner */}
-          <Card className="shrink-0 border-amber-500/40 bg-amber-500/5">
-            <CardContent className="pt-4 flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-              <div className="text-xs">
-                <div className="font-semibold text-amber-700 dark:text-amber-400">
-                  這個功能的目的是「學 RL」而非「賺錢」
-                </div>
-                <div className="text-amber-700/80 dark:text-amber-400/80 mt-1">
-                  RL 在台指期日頻的歷史實證效果有限。我們的 ML 測試：XGBoost OOS 勝率 56.9%（≈ 隨機）。
-                  散戶劣勢：execution gap 0.3% × 2、單台電腦、無 co-location。
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <WarningChart />
 
-          {/* 標題 */}
           <div className="shrink-0 flex items-center justify-between gap-3">
             <div>
               <h1 className="text-lg font-semibold flex items-center gap-2">
@@ -144,11 +135,11 @@ export default function TXRLEnvironmentPage() {
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 lg:grid-cols-2 gap-4 pb-4">
-            {/* Action Space */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Action Space（可調參）</CardTitle>
-                <CardDescription className="text-xs">RL agent 每次可採取的動作</CardDescription>
+                <BlockTitle title="Action Space（可調參）" helpContent={ACTION_SPACE_MD}>
+                  <CardDescription className="text-xs">RL agent 每次可採取的動作</CardDescription>
+                </BlockTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {ACTION_OPTIONS.map((o) => (
@@ -170,11 +161,11 @@ export default function TXRLEnvironmentPage() {
               </CardContent>
             </Card>
 
-            {/* Reward Function */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Reward Function（可調參）</CardTitle>
-                <CardDescription className="text-xs">訓練時 agent 嘗試最大化的目標</CardDescription>
+                <BlockTitle title="Reward Function（可調參）" helpContent={REWARD_FUNCTION_MD}>
+                  <CardDescription className="text-xs">訓練時 agent 嘗試最大化的目標</CardDescription>
+                </BlockTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {REWARD_OPTIONS.map((o) => (
@@ -218,11 +209,11 @@ export default function TXRLEnvironmentPage() {
               </CardContent>
             </Card>
 
-            {/* State Features */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">State Features</CardTitle>
-                <CardDescription className="text-xs">Agent 觀察的特徵集合</CardDescription>
+                <BlockTitle title="State Features" helpContent={STATE_FEATURES_MD}>
+                  <CardDescription className="text-xs">Agent 觀察的特徵集合</CardDescription>
+                </BlockTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {FEATURE_GROUPS.map((g) => (
@@ -245,11 +236,11 @@ export default function TXRLEnvironmentPage() {
               </CardContent>
             </Card>
 
-            {/* Algorithm + 超參數 */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Algorithm 與超參數</CardTitle>
-                <CardDescription className="text-xs">stable-baselines3 預設值，可調</CardDescription>
+                <BlockTitle title="Algorithm 與超參數" helpContent={ALGORITHM_MD}>
+                  <CardDescription className="text-xs">stable-baselines3 預設值，可調</CardDescription>
+                </BlockTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="space-y-1.5">
@@ -313,13 +304,11 @@ export default function TXRLEnvironmentPage() {
               </CardContent>
             </Card>
 
-            {/* 資料區間 + Walk-Forward */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Database className="h-4 w-4" /> 資料區間
-                </CardTitle>
-                <CardDescription className="text-xs">使用已下載的 TWII 資料（495 筆）</CardDescription>
+                <BlockTitle title="資料區間" helpContent={DATA_RANGE_MD}>
+                  <CardDescription className="text-xs">使用已下載的 TWII 資料（495 筆）</CardDescription>
+                </BlockTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-3">
@@ -341,10 +330,9 @@ export default function TXRLEnvironmentPage() {
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Settings className="h-4 w-4" /> Walk-Forward
-                </CardTitle>
-                <CardDescription className="text-xs">強制啟用（避免 overfitting）</CardDescription>
+                <BlockTitle title="Walk-Forward" helpContent={WALK_FORWARD_MD}>
+                  <CardDescription className="text-xs">強制啟用（避免 overfitting）</CardDescription>
+                </BlockTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <label className="flex items-center gap-2">

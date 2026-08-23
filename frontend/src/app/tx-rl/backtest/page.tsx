@@ -4,9 +4,12 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { AppShell } from '@/components/app-shell'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle, Bot, ChevronRight, Loader2 } from 'lucide-react'
+import { WarningChart } from '@/components/tx-rl/WarningChart'
+import { BlockTitle } from '@/components/tx-rl/HelpButton'
+import { BACKTEST_METRICS_MD, BACKTEST_SUMMARY_MD } from '@/components/tx-rl/help-content'
 
 interface TxRLMetrics {
   cumulative_return_pct: number
@@ -80,20 +83,7 @@ export default function TXRLBacktestPage() {
   return (
     <AppShell title="台指期 RL — 回測結果">
       <div className="flex flex-col h-full min-h-0 gap-4 p-4 lg:p-6">
-        <Card className="shrink-0 border-amber-500/40 bg-amber-500/5">
-          <CardContent className="pt-4 flex items-start gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-            <div className="text-xs">
-              <div className="font-semibold text-amber-700 dark:text-amber-400">
-                這個功能的目的是「學 RL」而非「賺錢」
-              </div>
-              <div className="text-amber-700/80 dark:text-amber-400/80 mt-1">
-                結果來自真實 RL 訓練（job {result.job_id.slice(0, 8)}…）。
-                對照 Buy & Hold 0050 / TWII 請到「評估對照」頁。
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <WarningChart />
 
         <div className="shrink-0 flex items-center justify-between gap-3">
           <div>
@@ -114,7 +104,7 @@ export default function TXRLBacktestPage() {
         <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 lg:grid-cols-3 gap-4 pb-4">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm">核心指標</CardTitle>
+              <BlockTitle title="核心指標" helpContent={BACKTEST_METRICS_MD} />
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3">
@@ -128,7 +118,7 @@ export default function TXRLBacktestPage() {
 
           <Card className="lg:col-span-2">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm">訓練摘要</CardTitle>
+              <BlockTitle title="訓練摘要" helpContent={BACKTEST_SUMMARY_MD} />
             </CardHeader>
             <CardContent className="space-y-2">
               <Row label="交易次數" value={m.num_trades.toString()} />

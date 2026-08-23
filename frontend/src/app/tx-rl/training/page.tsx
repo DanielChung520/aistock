@@ -5,11 +5,14 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { AppShell } from '@/components/app-shell'
 import { Toaster } from '@/components/ui/sonner'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { AlertTriangle, Bot, Loader2, Check, StopCircle, Activity } from 'lucide-react'
+import { WarningChart } from '@/components/tx-rl/WarningChart'
+import { BlockTitle } from '@/components/tx-rl/HelpButton'
+import { TRAINING_STATUS_MD, TRAINING_PROGRESS_MD } from '@/components/tx-rl/help-content'
 
 type Status = 'idle' | 'running' | 'completed' | 'failed'
 
@@ -86,20 +89,7 @@ export default function TXRLTrainingPage() {
       <Toaster richColors position="top-center" />
       <AppShell title="台指期 RL — 訓練監控">
         <div className="flex flex-col h-full min-h-0 gap-4 p-4 lg:p-6">
-          {/* 警告 Banner */}
-          <Card className="shrink-0 border-amber-500/40 bg-amber-500/5">
-            <CardContent className="pt-4 flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-              <div className="text-xs">
-                <div className="font-semibold text-amber-700 dark:text-amber-400">
-                  這個功能的目的是「學 RL」而非「賺錢」
-                </div>
-                <div className="text-amber-700/80 dark:text-amber-400/80 mt-1">
-                  目前顯示為 mock 數據。Backend Celery + stable-baselines3 待 SPEC 確認後實作。
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <WarningChart />
 
           {/* 標題 */}
           <div className="shrink-0 flex items-center justify-between gap-3">
@@ -134,7 +124,7 @@ export default function TXRLTrainingPage() {
             {/* 狀態卡片 */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">狀態</CardTitle>
+                <BlockTitle title="狀態" helpContent={TRAINING_STATUS_MD} />
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center gap-2">
@@ -166,10 +156,11 @@ export default function TXRLTrainingPage() {
             {/* 即時狀態摘要 */}
             <Card className="lg:col-span-2">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">訓練進度</CardTitle>
-                <CardDescription className="text-xs">
-                  {status === 'running' ? '訓練進行中，每 2 秒更新' : status === 'completed' ? '訓練已完成，可至回測頁看結果' : '等待啟動'}
-                </CardDescription>
+                <BlockTitle title="訓練進度" helpContent={TRAINING_PROGRESS_MD}>
+                  <CardDescription className="text-xs">
+                    {status === 'running' ? '訓練進行中，每 2 秒更新' : status === 'completed' ? '訓練已完成，可至回測頁看結果' : '等待啟動'}
+                  </CardDescription>
+                </BlockTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-3 gap-3">
