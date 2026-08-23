@@ -11,7 +11,7 @@ import { AlertTriangle, Bot, Trophy, Download, ArrowUpRight, ArrowDownRight, Loa
 import { WarningChart } from '@/components/tx-rl/WarningChart'
 import { BlockTitle } from '@/components/tx-rl/HelpButton'
 import {
-  EVAL_TABS_MD, EVAL_EQUITY_CURVE_MD, EVAL_DRAWDOWN_MD,
+  EVAL_EQUITY_CURVE_MD, EVAL_DRAWDOWN_MD,
   EVAL_TRADE_SCATTER_MD, EVAL_REWARD_CURVE_MD,
 } from '@/components/tx-rl/help-content'
 import {

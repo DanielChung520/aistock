@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { AlertTriangle, Bot, Loader2, Check, StopCircle, Activity } from 'lucide-react'
+import { Bot, Loader2, Check, StopCircle, Activity } from 'lucide-react'
 import { WarningChart } from '@/components/tx-rl/WarningChart'
 import { BlockTitle } from '@/components/tx-rl/HelpButton'
 import { TRAINING_STATUS_MD, TRAINING_PROGRESS_MD } from '@/components/tx-rl/help-content'

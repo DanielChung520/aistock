@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Bot, Database, Settings, Play, Sparkles } from 'lucide-react'
+import { Bot, Play, Sparkles } from 'lucide-react'
 import { WarningChart } from '@/components/tx-rl/WarningChart'
 import { BlockTitle } from '@/components/tx-rl/HelpButton'
 import {

@@ -24,6 +24,42 @@ function renderMarkdown(md: string) {
       }
       elements.push(<ul key={key++} className="my-1.5 space-y-0.5">{items}</ul>)
       continue
+    } else if (line.trim().startsWith('|') && i + 1 < lines.length && /^\s*\|[\s\-:|]+\|\s*$/.test(lines[i + 1])) {
+      const parseRow = (s: string) => s.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map((c) => c.trim())
+      const headerCells = parseRow(line)
+      i += 2
+      const bodyRows: string[][] = []
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        bodyRows.push(parseRow(lines[i]))
+        i++
+      }
+      elements.push(
+        <div key={key++} className="my-2 overflow-x-auto rounded border border-border/60">
+          <table className="w-full text-xs">
+            <thead className="bg-muted/40">
+              <tr>
+                {headerCells.map((h, j) => (
+                  <th key={j} className="text-left px-2 py-1.5 font-semibold border-b border-border/60 whitespace-nowrap">
+                    {renderInline(h)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {bodyRows.map((row, ri) => (
+                <tr key={ri} className="border-b border-border/30 last:border-b-0">
+                  {row.map((c, j) => (
+                    <td key={j} className="px-2 py-1.5 align-top">
+                      {renderInline(c)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+      )
+      continue
     } else if (line.trim() === '') {
       i++
       continue
