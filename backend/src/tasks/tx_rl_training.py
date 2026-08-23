@@ -164,6 +164,10 @@ def train_tx_rl_agent_task(self, job_id: str, config: dict) -> dict:
         )
 
         total_timesteps = config["model"].get("total_timesteps", 50000)
+        db.collection(JOBS_COLLECTION).update({
+            "_key": job_id,
+            "total_timesteps": total_timesteps,
+        })
         model.learn(total_timesteps=total_timesteps)
 
         MODEL_DIR.mkdir(parents=True, exist_ok=True)

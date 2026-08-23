@@ -71,6 +71,7 @@ def get_latest_job() -> dict:
         "job_id": doc["job_id"],
         "status": doc.get("status"),
         "created_at": doc.get("created_at"),
+        "total_timesteps": doc.get("total_timesteps", 0),
     }
 
 

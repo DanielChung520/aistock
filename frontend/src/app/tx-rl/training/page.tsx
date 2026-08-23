@@ -16,11 +16,16 @@ import { TRAINING_STATUS_MD, TRAINING_PROGRESS_MD } from '@/components/tx-rl/hel
 
 type Status = 'idle' | 'running' | 'completed' | 'failed'
 
+const STORED_CONFIG = typeof window !== 'undefined'
+  ? (() => { try { return JSON.parse(sessionStorage.getItem('tx_rl_config') || 'null') } catch { return null } })()
+  : null
+const INITIAL_TOTAL_STEPS = STORED_CONFIG?.model?.total_timesteps ?? 50000
+
 export default function TXRLTrainingPage() {
   const router = useRouter()
   const [status, setStatus] = useState<Status>('idle')
   const [currentStep, setCurrentStep] = useState(0)
-  const [totalSteps] = useState(50000)
+  const [totalSteps, setTotalSteps] = useState<number>(INITIAL_TOTAL_STEPS)
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
