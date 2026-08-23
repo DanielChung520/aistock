@@ -8,6 +8,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AlertTriangle, Bot, Trophy, Download, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react'
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  ScatterChart, Scatter, ZAxis,
+  AreaChart, Area,
+} from 'recharts'
 
 interface RawMetric {
   cumulative_return_pct?: number
@@ -16,13 +21,16 @@ interface RawMetric {
   win_rate_pct?: number
   num_trades?: number
   num_steps?: number
+  equity_curve?: { date: string; equity: number; drawdown: number; position?: number }[]
+  trade_list?: { date: string; action: string; entry_price: number; position: number }[]
+  episode_rewards?: { step: number; reward: number }[]
 }
 
 interface CompareResponse {
   tx_rl_agent: RawMetric
-  buy_hold_twii: { cumulative_return_pct: number; name: string }
-  buy_hold_0050: { cumulative_return_pct: number; name: string; note: string }
-  ma_crossover: { cumulative_return_pct: number; num_trades: number; name: string }
+  buy_hold_twii: { cumulative_return_pct: number; name: string; equity_curve: { date: string; equity: number; drawdown: number }[] }
+  buy_hold_0050: { cumulative_return_pct: number; name: string; note: string; equity_curve: { date: string; equity: number; drawdown: number }[] }
+  ma_crossover: { cumulative_return_pct: number; num_trades: number; name: string; equity_curve: { date: string; equity: number; drawdown: number }[] }
 }
 
 interface Strategy {
@@ -40,10 +48,10 @@ interface Strategy {
 }
 
 const COLOR_BY_TYPE: Record<Strategy['type'], string> = {
-  benchmark: 'bg-slate-500',
-  rule: 'bg-blue-500',
-  ml: 'bg-purple-500',
-  rl: 'bg-amber-500',
+  benchmark: '#64748b',
+  rule: '#3b82f6',
+  ml: '#a855f7',
+  rl: '#f59e0b',
 }
 
 const LABEL_BY_TYPE: Record<Strategy['type'], string> = {
@@ -51,6 +59,13 @@ const LABEL_BY_TYPE: Record<Strategy['type'], string> = {
   rule: '規則',
   ml: '監督式 ML',
   rl: '強化學習',
+}
+
+const EQUITY_COLOR: Record<string, string> = {
+  'TX-RL Agent': '#f59e0b',
+  'Buy & Hold 0050': '#64748b',
+  'Buy & Hold TWII': '#94a3b8',
+  'MA5/MA20 Crossover': '#3b82f6',
 }
 
 function rawToStrategy(name: string, type: Strategy['type'], raw: RawMetric, note: string): Strategy {
@@ -70,8 +85,9 @@ function rawToStrategy(name: string, type: Strategy['type'], raw: RawMetric, not
 
 export default function TXRLEvaluationPage() {
   const router = useRouter()
-  const [filterType, setFilterType] = useState<'all' | Strategy['type']>('all')
+  const [tab, setTab] = useState<'compare' | 'visualize'>('compare')
   const [strategies, setStrategies] = useState<Strategy[]>([])
+  const [raw, setRaw] = useState<CompareResponse | null>(null)
   const jobId = typeof window !== 'undefined' ? sessionStorage.getItem('tx_rl_job_id') : null
   const [loading, setLoading] = useState(!jobId)
   const [error, setError] = useState<string | null>(
@@ -90,13 +106,13 @@ export default function TXRLEvaluationPage() {
         return r.json()
       })
       .then((d: CompareResponse) => {
-        const list: Strategy[] = [
+        setRaw(d)
+        setStrategies([
           rawToStrategy('Buy & Hold 0050', 'benchmark', d.buy_hold_0050, d.buy_hold_0050.note),
           rawToStrategy('Buy & Hold TWII', 'benchmark', d.buy_hold_twii, '大盤 beta 追蹤'),
           rawToStrategy('MA5/MA20 Crossover', 'rule', d.ma_crossover, 'DanielMA 規則'),
           rawToStrategy('TX-RL Agent (本次)', 'rl', d.tx_rl_agent, `Job ${jobId.slice(0, 8)}…`),
-        ]
-        setStrategies(list)
+        ])
       })
       .catch((e) => {
         const msg = e instanceof Error ? e.message : String(e)
@@ -116,7 +132,7 @@ export default function TXRLEvaluationPage() {
     )
   }
 
-  if (error || strategies.length === 0) {
+  if (error || !raw) {
     return (
       <AppShell title="台指期 RL — 評估對照">
         <div className="flex flex-col items-center justify-center h-full gap-3 text-sm">
@@ -129,7 +145,6 @@ export default function TXRLEvaluationPage() {
     )
   }
 
-  const filtered = filterType === 'all' ? strategies : strategies.filter((s) => s.type === filterType)
   const txRL = strategies.find((s) => s.type === 'rl')!
   const buyHold0050 = strategies.find((s) => s.name === 'Buy & Hold 0050')!
   const alpha = txRL.cum_return - buyHold0050.cum_return
@@ -145,7 +160,7 @@ export default function TXRLEvaluationPage() {
                 這個功能的目的是「學 RL」而非「賺錢」
               </div>
               <div className="text-amber-700/80 dark:text-amber-400/80 mt-1">
-                4 個策略對照，數據來自真實訓練結果 + 後端 /compare 計算的 Buy & Hold / MA Crossover。
+                4 個策略對照 + 4 個互動圖表。數據來自真實訓練結果 + 後端 /compare 計算的 Buy & Hold / MA Crossover。
               </div>
             </div>
           </CardContent>
@@ -172,121 +187,290 @@ export default function TXRLEvaluationPage() {
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pb-4">
-          <Card className={alpha >= 0 ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-red-500/40 bg-red-500/5'}>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2 mb-2">
-                {alpha >= 0 ? <Trophy className="h-4 w-4 text-emerald-500" /> : <AlertTriangle className="h-4 w-4 text-red-500" />}
-                <h2 className="text-sm font-semibold">
-                  TX-RL vs Buy & Hold 0050：累積報酬 alpha = {alpha >= 0 ? '+' : ''}{alpha.toFixed(1)} 個百分點
-                </h2>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {alpha >= 0
-                  ? `TX-RL 累積 ${txRL.cum_return.toFixed(1)}% 比 Buy & Hold 0050 (${buyHold0050.cum_return.toFixed(1)}%) 高 ${alpha.toFixed(1)}%。但注意：交易成本、MDD、Sharpe 仍需綜合判斷。`
-                  : `TX-RL 累積 ${txRL.cum_return.toFixed(1)}% 比 Buy & Hold 0050 (${buyHold0050.cum_return.toFixed(1)}%) 低 ${Math.abs(alpha).toFixed(1)}%。這在學術上屬於「預期結果」——日頻 RL 鮮少打贏 Buy & Hold。重點是「學 RL 流程」而不是「賺錢」。`}
-              </p>
-            </CardContent>
-          </Card>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+          <TabsList>
+            <TabsTrigger value="compare">對照表</TabsTrigger>
+            <TabsTrigger value="visualize">可視化 ({4} 圖表)</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-          <Tabs value={filterType} onValueChange={(v) => setFilterType(v as typeof filterType)}>
-            <TabsList>
-              <TabsTrigger value="all">全部 ({strategies.length})</TabsTrigger>
-              <TabsTrigger value="benchmark">基準</TabsTrigger>
-              <TabsTrigger value="rule">規則</TabsTrigger>
-              <TabsTrigger value="rl" className="text-amber-600 dark:text-amber-400">RL</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-muted/30 text-muted-foreground border-b">
-                    <tr>
-                      <th className="text-left px-3 py-2 font-medium">策略</th>
-                      <th className="text-left px-3 py-2 font-medium">類型</th>
-                      <th className="text-right px-3 py-2 font-medium">累積%</th>
-                      <th className="text-right px-3 py-2 font-medium">年化%</th>
-                      <th className="text-right px-3 py-2 font-medium">Sharpe</th>
-                      <th className="text-right px-3 py-2 font-medium">MDD%</th>
-                      <th className="text-right px-3 py-2 font-medium">Calmar</th>
-                      <th className="text-right px-3 py-2 font-medium">勝率</th>
-                      <th className="text-right px-3 py-2 font-medium">交易次數</th>
-                      <th className="text-left px-3 py-2 font-medium">備註</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((s) => (
-                      <tr key={s.name} className={`border-b border-border/30 hover:bg-muted/20 ${s.type === 'rl' ? 'bg-amber-500/5' : ''}`}>
-                        <td className="px-3 py-2 font-medium">{s.name}</td>
-                        <td className="px-3 py-2">
-                          <span className={`text-[10px] text-white px-1.5 py-0.5 rounded ${COLOR_BY_TYPE[s.type]}`}>
-                            {LABEL_BY_TYPE[s.type]}
-                          </span>
-                        </td>
-                        <td className={`px-3 py-2 text-right tabular-nums font-bold ${s.cum_return >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                          <span className="inline-flex items-center gap-0.5">
-                            {s.cum_return >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                            {s.cum_return >= 0 ? '+' : ''}{s.cum_return.toFixed(1)}
-                          </span>
-                        </td>
-                        <td className={`px-3 py-2 text-right tabular-nums ${s.ann_return >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {s.ann_return >= 0 ? '+' : ''}{s.ann_return.toFixed(1)}
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">{s.sharpe.toFixed(2)}</td>
-                        <td className={`px-3 py-2 text-right tabular-nums ${s.mdd < -30 ? 'text-red-600 dark:text-red-400' : s.mdd < -20 ? 'text-amber-600 dark:text-amber-400' : ''}`}>
-                          {s.mdd.toFixed(1)}
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">{s.calmar.toFixed(2)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{s.win_rate !== null ? `${s.win_rate.toFixed(1)}%` : '—'}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{s.num_trades !== null ? s.num_trades : '—'}</td>
-                        <td className="px-3 py-2 text-[10px] text-muted-foreground">{s.note}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">5 維能力對比（正規化到 0-100）</CardTitle>
-              <CardDescription className="text-xs">每個維度用策略中最佳值做 100 分基準</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2.5">
-              {(['cum_return', 'sharpe', 'calmar', 'mdd', 'win_rate'] as const).map((dim) => {
-                const best = Math.max(...strategies.map((s) => {
-                  const v = s[dim]
-                  return typeof v === 'number' && v !== null ? Math.abs(v) : 0
-                }))
-                return (
-                  <div key={dim}>
-                    <div className="text-[10px] text-muted-foreground mb-1">{dim}（基準 {best.toFixed(1)}）</div>
-                    <div className="space-y-1">
-                      {strategies.map((s) => {
-                        const v = s[dim]
-                        const val = typeof v === 'number' && v !== null ? Math.abs(v) : 0
-                        const pct = best > 0 ? (val / best) * 100 : 0
-                        return (
-                          <div key={s.name} className="flex items-center gap-2 text-[10px]">
-                            <div className="w-32 truncate text-muted-foreground">{s.name}</div>
-                            <div className="flex-1 h-3 bg-muted/30 rounded-sm overflow-hidden">
-                              <div className={`h-full ${COLOR_BY_TYPE[s.type]}`} style={{ width: `${pct}%` }} />
-                            </div>
-                            <div className="w-10 text-right tabular-nums">{pct.toFixed(0)}</div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )
-              })}
-            </CardContent>
-          </Card>
+        <div className="flex-1 min-h-0 overflow-y-auto pb-4">
+          {tab === 'compare' && <CompareTable strategies={strategies} alpha={alpha} txRL={txRL} buyHold0050={buyHold0050} />}
+          {tab === 'visualize' && <VisualizePanel raw={raw} />}
         </div>
       </div>
     </AppShell>
+  )
+}
+
+function CompareTable({ strategies, alpha, txRL, buyHold0050 }: {
+  strategies: Strategy[]
+  alpha: number
+  txRL: Strategy
+  buyHold0050: Strategy
+}) {
+  return (
+    <div className="space-y-4">
+      <Card className={alpha >= 0 ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-red-500/40 bg-red-500/5'}>
+        <CardContent className="pt-4">
+          <div className="flex items-center gap-2 mb-2">
+            {alpha >= 0 ? <Trophy className="h-4 w-4 text-emerald-500" /> : <AlertTriangle className="h-4 w-4 text-red-500" />}
+            <h2 className="text-sm font-semibold">
+              TX-RL vs Buy & Hold 0050：累積報酬 alpha = {alpha >= 0 ? '+' : ''}{alpha.toFixed(1)} 個百分點
+            </h2>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {alpha >= 0
+              ? `TX-RL 累積 ${txRL.cum_return.toFixed(1)}% 比 Buy & Hold 0050 (${buyHold0050.cum_return.toFixed(1)}%) 高 ${alpha.toFixed(1)}%。但注意：交易成本、MDD、Sharpe 仍需綜合判斷。`
+              : `TX-RL 累積 ${txRL.cum_return.toFixed(1)}% 比 Buy & Hold 0050 (${buyHold0050.cum_return.toFixed(1)}%) 低 ${Math.abs(alpha).toFixed(1)}%。這在學術上屬於「預期結果」——日頻 RL 鮮少打敗 Buy & Hold。重點是「學 RL 流程」而不是「賺錢」。`}
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/30 text-muted-foreground border-b">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium">策略</th>
+                  <th className="text-left px-3 py-2 font-medium">類型</th>
+                  <th className="text-right px-3 py-2 font-medium">累積%</th>
+                  <th className="text-right px-3 py-2 font-medium">年化%</th>
+                  <th className="text-right px-3 py-2 font-medium">Sharpe</th>
+                  <th className="text-right px-3 py-2 font-medium">MDD%</th>
+                  <th className="text-right px-3 py-2 font-medium">Calmar</th>
+                  <th className="text-right px-3 py-2 font-medium">勝率</th>
+                  <th className="text-right px-3 py-2 font-medium">交易次數</th>
+                  <th className="text-left px-3 py-2 font-medium">備註</th>
+                </tr>
+              </thead>
+              <tbody>
+                {strategies.map((s) => (
+                  <tr key={s.name} className={`border-b border-border/30 hover:bg-muted/20 ${s.type === 'rl' ? 'bg-amber-500/5' : ''}`}>
+                    <td className="px-3 py-2 font-medium">{s.name}</td>
+                    <td className="px-3 py-2">
+                      <span className="text-[10px] text-white px-1.5 py-0.5 rounded" style={{ background: COLOR_BY_TYPE[s.type] }}>
+                        {LABEL_BY_TYPE[s.type]}
+                      </span>
+                    </td>
+                    <td className={`px-3 py-2 text-right tabular-nums font-bold ${s.cum_return >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                      <span className="inline-flex items-center gap-0.5">
+                        {s.cum_return >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                        {s.cum_return >= 0 ? '+' : ''}{s.cum_return.toFixed(1)}
+                      </span>
+                    </td>
+                    <td className={`px-3 py-2 text-right tabular-nums ${s.ann_return >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {s.ann_return >= 0 ? '+' : ''}{s.ann_return.toFixed(1)}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">{s.sharpe.toFixed(2)}</td>
+                    <td className={`px-3 py-2 text-right tabular-nums ${s.mdd < -30 ? 'text-red-600 dark:text-red-400' : s.mdd < -20 ? 'text-amber-600 dark:text-amber-400' : ''}`}>
+                      {s.mdd.toFixed(1)}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">{s.calmar.toFixed(2)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{s.win_rate !== null ? `${s.win_rate.toFixed(1)}%` : '—'}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{s.num_trades !== null ? s.num_trades : '—'}</td>
+                    <td className="px-3 py-2 text-[10px] text-muted-foreground">{s.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function VisualizePanel({ raw }: { raw: CompareResponse }) {
+  const rl = raw.tx_rl_agent
+  const eqRl = rl.equity_curve ?? []
+  const eqTwii = raw.buy_hold_twii.equity_curve ?? []
+  const eq0050 = raw.buy_hold_0050.equity_curve ?? []
+  const eqMa = raw.ma_crossover.equity_curve ?? []
+
+  const equityMerged = eqTwii.map((d, i) => ({
+    date: d.date,
+    'Buy & Hold 0050': eq0050[i]?.equity ?? null,
+    'Buy & Hold TWII': d.equity,
+    'MA5/MA20 Crossover': eqMa[i]?.equity ?? null,
+    'TX-RL Agent': eqRl[i]?.equity ?? null,
+  }))
+
+  const drawdownMerged = eqTwii.map((d, i) => ({
+    date: d.date,
+    'Buy & Hold 0050': (eq0050[i]?.drawdown ?? 0) * 100,
+    'Buy & Hold TWII': d.drawdown * 100,
+    'MA5/MA20 Crossover': (eqMa[i]?.drawdown ?? 0) * 100,
+    'TX-RL Agent': (eqRl[i]?.drawdown ?? 0) * 100,
+  }))
+
+  const tradesScatter = (rl.trade_list ?? []).map((t) => ({
+    date: new Date(t.date).getTime(),
+    action: t.action,
+    entry_price: t.entry_price,
+    position: t.position,
+  }))
+
+  const rewardsData = (rl.episode_rewards ?? []).map((r) => ({
+    step: r.step,
+    reward: r.reward,
+  }))
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">1. Equity Curve — 4 策略資金曲線對比</CardTitle>
+          <CardDescription className="text-xs">起點 = 1.0，hover 顯示當日詳細。終點差距 = alpha</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChartBox height={280}>
+            <LineChart data={equityMerged}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(2, 10)} interval={Math.floor(equityMerged.length / 6)} />
+              <YAxis tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
+              <Tooltip content={<EquityTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              {Object.entries(EQUITY_COLOR).map(([name, color]) => (
+                <Line key={name} type="monotone" dataKey={name} stroke={color} dot={false} strokeWidth={1.5} connectNulls />
+              ))}
+            </LineChart>
+          </ChartBox>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">2. Drawdown Timeline — 回撤隨時間變化</CardTitle>
+          <CardDescription className="text-xs">負值越大代表從最高點跌越深。TX-RL 通常震盪最大（最不穩定）</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChartBox height={240}>
+            <LineChart data={drawdownMerged}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(2, 10)} interval={Math.floor(drawdownMerged.length / 6)} />
+              <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${v.toFixed(0)}%`} domain={['auto', 0]} />
+              <Tooltip content={<DDTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              {Object.entries(EQUITY_COLOR).map(([name, color]) => (
+                <Line key={name} type="monotone" dataKey={name} stroke={color} dot={false} strokeWidth={1.2} connectNulls />
+              ))}
+            </LineChart>
+          </ChartBox>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">3. TX-RL 進場點散佈</CardTitle>
+          <CardDescription className="text-xs">每個點 = 一次進場。X 軸 = 進場日期，Y 軸 = 進場價。Buy=綠, Sell=紅</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {tradesScatter.length === 0 ? (
+            <div className="h-48 flex items-center justify-center text-xs text-muted-foreground">此訓練無進場紀錄</div>
+          ) : (
+            <ChartBox height={200}>
+              <ScatterChart>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" type="number" domain={['dataMin', 'dataMax']} tickFormatter={(v) => new Date(v).toISOString().slice(2, 10)} scale="time" />
+                <YAxis dataKey="entry_price" type="number" tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
+                <ZAxis range={[40, 200]} />
+                <Tooltip content={<ScatterTooltip />} />
+                <Scatter name="Buy" data={tradesScatter.filter((t) => t.position > 0)} fill="#10b981" />
+                <Scatter name="Sell" data={tradesScatter.filter((t) => t.position < 0)} fill="#ef4444" />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+              </ScatterChart>
+            </ChartBox>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">4. Reward 訓練曲線（PPO episode reward）</CardTitle>
+          <CardDescription className="text-xs">每個點 = 一個 episode 的累計 reward。趨勢上升 = 學習中；震盪 = 已收斂或過擬合</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {rewardsData.length === 0 ? (
+            <div className="h-48 flex items-center justify-center text-xs text-muted-foreground">無 reward 歷史</div>
+          ) : (
+            <ChartBox height={240}>
+              <AreaChart data={rewardsData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="step" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip content={<RewardTooltip />} />
+                <Area type="monotone" dataKey="reward" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
+              </AreaChart>
+            </ChartBox>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function ChartBox({ children, height }: { children: React.ReactElement; height: number }) {
+  return (
+    <div style={{ width: '100%', height }} className="rounded border bg-card p-2">
+      <ResponsiveContainer width="100%" height="100%">
+        {children}
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+function EquityTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
+  if (!active || !payload || payload.length === 0) return null
+  return (
+    <div className="bg-background border border-border rounded shadow-lg p-2 text-[10px]">
+      <div className="font-mono text-muted-foreground mb-1">{label}</div>
+      {payload.filter((p) => p.value !== null).map((p) => (
+        <div key={p.name} className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full" style={{ background: p.color }} />
+          <span className="text-muted-foreground">{p.name}:</span>
+          <span className="font-mono font-semibold tabular-nums">{(p.value ?? 0).toFixed(4)}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function DDTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
+  if (!active || !payload || payload.length === 0) return null
+  return (
+    <div className="bg-background border border-border rounded shadow-lg p-2 text-[10px]">
+      <div className="font-mono text-muted-foreground mb-1">{label}</div>
+      {payload.filter((p) => p.value !== null).map((p) => (
+        <div key={p.name} className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full" style={{ background: p.color }} />
+          <span className="text-muted-foreground">{p.name}:</span>
+          <span className="font-mono font-semibold tabular-nums text-red-600">{(p.value ?? 0).toFixed(2)}%</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ScatterTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: { date: number; entry_price: number; position: number } }> }) {
+  if (!active || !payload || payload.length === 0) return null
+  const p = payload[0].payload
+  return (
+    <div className="bg-background border border-border rounded shadow-lg p-2 text-[10px]">
+      <div className="font-mono text-muted-foreground">{new Date(p.date).toISOString().slice(0, 10)}</div>
+      <div>進場價: <span className="font-mono font-semibold">{p.entry_price.toFixed(2)}</span></div>
+      <div>部位: <span className="font-mono font-semibold">{p.position > 0 ? `Long +${p.position}` : `Short ${p.position}`}</span></div>
+    </div>
+  )
+}
+
+function RewardTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: number }) {
+  if (!active || !payload || payload.length === 0) return null
+  return (
+    <div className="bg-background border border-border rounded shadow-lg p-2 text-[10px]">
+      <div className="font-mono text-muted-foreground">Step {label}</div>
+      <div>Reward: <span className="font-mono font-semibold tabular-nums">{(payload[0].value ?? 0).toFixed(4)}</span></div>
+    </div>
   )
 }

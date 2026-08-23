@@ -100,6 +100,9 @@ def compare_with_baselines(req: dict) -> dict:
         raise HTTPException(status_code=404, detail="result not found")
     rl_doc = db.collection(MODELS_COLLECTION).get(job_id)
     rl_metrics = rl_doc.get("metrics", {})
+    rl_equity = rl_doc.get("equity_curve", [])
+    rl_trades = rl_doc.get("trade_list", [])
+    rl_rewards = rl_doc.get("episode_rewards", [])
 
     df = _load_twii_df()
     close_list = df["close"].astype(float).tolist()
@@ -109,12 +112,35 @@ def compare_with_baselines(req: dict) -> dict:
         raise HTTPException(status_code=422, detail="insufficient data")
 
     twii_return = float((close_list[-1] / close_list[0] - 1) * 100)
-    buy_hold_twii = {"cumulative_return_pct": twii_return, "name": "Buy & Hold TWII"}
+    twii_equity = [
+        {"date": dates[i], "equity": round(close_list[i] / close_list[0], 4), "drawdown": 0.0}
+        for i in range(n)
+    ]
+    twii_peak = close_list[0]
+    for i in range(n):
+        twii_peak = max(twii_peak, close_list[i])
+        dd = (close_list[i] / twii_peak - 1)
+        twii_equity[i]["drawdown"] = round(dd, 4)
+    buy_hold_twii = {
+        "cumulative_return_pct": round(twii_return, 2),
+        "name": "Buy & Hold TWII",
+        "equity_curve": twii_equity,
+    }
 
+    ratio_0050 = 0.78
+    bh0050_equity = [
+        {"date": dates[i], "equity": round(1.0 + ratio_0050 * (close_list[i] / close_list[0] - 1), 4), "drawdown": 0.0}
+        for i in range(n)
+    ]
+    bh0050_peak = 1.0
+    for i in range(n):
+        bh0050_peak = max(bh0050_peak, bh0050_equity[i]["equity"])
+        bh0050_equity[i]["drawdown"] = round(bh0050_equity[i]["equity"] / bh0050_peak - 1, 4)
     buy_hold_0050 = {
-        "cumulative_return_pct": round(twii_return * 0.78, 2),
+        "cumulative_return_pct": round(twii_return * ratio_0050, 2),
         "name": "Buy & Hold 0050 (proxy)",
         "note": "TWII × 0.78 proxy (0050 約 78% 曝險 TWII)",
+        "equity_curve": bh0050_equity,
     }
 
     highs = df["high"].astype(float).tolist()
@@ -124,29 +150,41 @@ def compare_with_baselines(req: dict) -> dict:
         df["volume"].astype(float).tolist(),
         cooldown=1, buy_slope_min=0.05, sell_slope_max=0.02,
     )
-    pnl = 0.0
+    pnl_pct = 0.0
     pos = 0
     entry = 0.0
     trades = 0
+    ma_equity = []
+    ma_peak = 0.0
     for i, sig in enumerate(sigs):
         if pos == 0 and sig.get("buy"):
             pos = 1
             entry = close_list[i]
         elif pos == 1 and sig.get("sell"):
-            pnl += (close_list[i] / entry - 1) * 100
+            pnl_pct += (close_list[i] / entry - 1) * 100
             pos = 0
             trades += 1
+        eq = 1.0 + pnl_pct / 100.0
+        ma_peak = max(ma_peak, eq)
+        dd = (eq / ma_peak - 1) if ma_peak > 0 else 0.0
+        ma_equity.append({"date": dates[i], "equity": round(eq, 4), "drawdown": round(dd, 4)})
     if pos == 1:
-        pnl += (close_list[-1] / entry - 1) * 100
+        pnl_pct += (close_list[-1] / entry - 1) * 100
         trades += 1
     ma_crossover = {
-        "cumulative_return_pct": round(pnl, 2),
+        "cumulative_return_pct": round(pnl_pct, 2),
         "num_trades": trades,
         "name": "MA5/MA20 Crossover (DanielMA)",
+        "equity_curve": ma_equity,
     }
 
     return {
-        "tx_rl_agent": rl_metrics,
+        "tx_rl_agent": {
+            **rl_metrics,
+            "equity_curve": rl_equity,
+            "trade_list": rl_trades,
+            "episode_rewards": rl_rewards,
+        },
         "buy_hold_twii": buy_hold_twii,
         "buy_hold_0050": buy_hold_0050,
         "ma_crossover": ma_crossover,

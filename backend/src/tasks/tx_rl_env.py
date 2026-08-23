@@ -206,10 +206,19 @@ class TXTradingEnv(gym.Env):
 
         cost_pct = (self.config.fees["slippage_pct"] + self.config.fees["commission_pct"]) * 2 / 100.0
 
+        prev_position = self.position
         self.position = target
         self.entry_price = entry_price
         self.days_held = 0
         self.num_trades += 1
+        if prev_position != target:
+            self.trade_history.append({
+                "step": self.current_step,
+                "date": str(self.df["date"].iloc[self.current_step]),
+                "action": "Buy" if target > 0 else "Sell" if target < 0 else "Hold",
+                "entry_price": entry_price,
+                "position": target,
+            })
         return cost_pct
 
     def _compute_reward(self, realized_pnl_pct: float, cost_pct: float) -> float:

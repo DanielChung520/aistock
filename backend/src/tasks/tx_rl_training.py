@@ -72,6 +72,44 @@ def _compute_metrics(env, model, episodes: int = 1) -> dict:
     }
 
 
+def _collect_visualization_data(env, model, df: pd.DataFrame, max_points: int = 500) -> tuple[list, list, list]:
+    """Run the trained policy once to collect per-day equity curve, trades, and rewards.
+
+    Returns:
+        equity_curve: list[{date, equity, drawdown, position}]
+        trade_list: list[{date, action, entry_price, position}]
+        episode_rewards: list[{step, reward}] (sampled to max_points)
+    """
+    equity_curve: list[dict] = []
+    obs, _ = env.reset()
+    done = False
+    while not done:
+        action, _ = model.predict(obs, deterministic=True)
+        step_idx = env.current_step
+        if step_idx < len(df):
+            equity_curve.append({
+                "date": str(df["date"].iloc[step_idx]),
+                "equity": round(1.0 + env.cum_pnl_pct / 100.0, 4),
+                "drawdown": round(env.drawdown, 4),
+                "position": env.position,
+            })
+        obs, _, terminated, truncated, _ = env.step(action)
+        done = terminated or truncated
+
+    rewards = env._reward_history
+    if len(rewards) > max_points:
+        step = max(1, len(rewards) // max_points)
+        sampled = rewards[::step]
+    else:
+        sampled = rewards
+    episode_rewards = [{"step": i * (len(rewards) // max(1, len(sampled))), "reward": round(float(r), 6)}
+                       for i, r in enumerate(sampled)]
+    if episode_rewards and (len(episode_rewards) - 1) * (len(rewards) // max(1, len(sampled))) < len(rewards) - 1:
+        episode_rewards.append({"step": len(rewards) - 1, "reward": round(float(rewards[-1]), 6)})
+
+    return equity_curve, list(env.trade_history), episode_rewards
+
+
 @celery_app.task(bind=True)
 def train_tx_rl_agent_task(self, job_id: str, config: dict) -> dict:
     """Train a TX RL agent and persist results.
@@ -133,6 +171,7 @@ def train_tx_rl_agent_task(self, job_id: str, config: dict) -> dict:
         model.save(str(model_path))
 
         metrics = _compute_metrics(env, model)
+        equity_curve, trade_list, episode_rewards = _collect_visualization_data(env, model, df)
 
         result = {
             "job_id": job_id,
@@ -150,6 +189,9 @@ def train_tx_rl_agent_task(self, job_id: str, config: dict) -> dict:
             "model_path": result["model_path"],
             "config": config,
             "metrics": metrics,
+            "equity_curve": equity_curve,
+            "trade_list": trade_list,
+            "episode_rewards": episode_rewards,
             "created_at": int(time.time()),
         })
         db.collection(JOBS_COLLECTION).update({
