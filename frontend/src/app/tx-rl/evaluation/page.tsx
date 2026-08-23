@@ -95,17 +95,37 @@ export default function TXRLEvaluationPage() {
   const [strategies, setStrategies] = useState<Strategy[]>([])
   const [raw, setRaw] = useState<CompareResponse | null>(null)
   const jobId = typeof window !== 'undefined' ? sessionStorage.getItem('tx_rl_job_id') : null
-  const [loading, setLoading] = useState(!jobId)
-  const [error, setError] = useState<string | null>(
-    jobId ? null : '找不到訓練 job，請從環境定義頁啟動訓練',
-  )
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [resolvedJobId, setResolvedJobId] = useState<string | null>(jobId)
 
   useEffect(() => {
-    if (!jobId) return
+    if (jobId) return
+    fetch('/api/tx-rl/jobs/latest')
+      .then((r) => {
+        if (r.status === 404) throw new Error('找不到訓練 job，請從環境定義頁啟動訓練')
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
+      .then((d) => {
+        sessionStorage.setItem('tx_rl_job_id', d.job_id)
+        setResolvedJobId(d.job_id)
+      })
+      .catch((e) => {
+        const msg = e instanceof Error ? e.message : String(e)
+        setError(msg)
+        toast.error(msg)
+        setLoading(false)
+      })
+  }, [jobId])
+
+  useEffect(() => {
+    const target = resolvedJobId
+    if (!target) return
     fetch('/api/tx-rl/compare', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ job_id: jobId }),
+      body: JSON.stringify({ job_id: target }),
     })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
@@ -117,7 +137,7 @@ export default function TXRLEvaluationPage() {
           rawToStrategy('Buy & Hold 0050', 'benchmark', d.buy_hold_0050, d.buy_hold_0050.note),
           rawToStrategy('Buy & Hold TWII', 'benchmark', d.buy_hold_twii, '大盤 beta 追蹤'),
           rawToStrategy('MA5/MA20 Crossover', 'rule', d.ma_crossover, 'DanielMA 規則'),
-          rawToStrategy('TX-RL Agent (本次)', 'rl', d.tx_rl_agent, `Job ${jobId.slice(0, 8)}…`),
+          rawToStrategy('TX-RL Agent (本次)', 'rl', d.tx_rl_agent, `Job ${target.slice(0, 8)}…`),
         ])
       })
       .catch((e) => {
@@ -126,7 +146,7 @@ export default function TXRLEvaluationPage() {
         toast.error('載入對照資料失敗', { description: msg })
       })
       .finally(() => setLoading(false))
-  }, [jobId])
+  }, [resolvedJobId])
 
   if (loading) {
     return (

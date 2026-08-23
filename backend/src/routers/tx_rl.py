@@ -50,6 +50,30 @@ def start_training(req: StartRunRequest) -> dict:
     return {"job_id": job_id, "status": "pending"}
 
 
+@router.get("/jobs/latest")
+def get_latest_job() -> dict:
+    """Return the most recent training job, or 404 if none exists.
+
+    Used as fallback when the browser lost sessionStorage (e.g. closed
+    tab, cleared cache) so the user can still see their latest results.
+    """
+    db = _get_db()
+    if not db.has_collection(JOBS_COLLECTION):
+        raise HTTPException(status_code=404, detail="no training jobs yet")
+    cursor = db.aql.execute(
+        f"FOR d IN {JOBS_COLLECTION} SORT d.created_at DESC LIMIT 1 RETURN d"
+    )
+    docs = list(cursor)
+    if not docs:
+        raise HTTPException(status_code=404, detail="no training jobs yet")
+    doc = docs[0]
+    return {
+        "job_id": doc["job_id"],
+        "status": doc.get("status"),
+        "created_at": doc.get("created_at"),
+    }
+
+
 @router.get("/jobs/{job_id}")
 def get_job(job_id: str) -> dict:
     """Get job status and progress."""

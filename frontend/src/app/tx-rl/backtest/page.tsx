@@ -31,14 +31,34 @@ export default function TXRLBacktestPage() {
   const router = useRouter()
   const [result, setResult] = useState<TxRLResult | null>(null)
   const jobId = typeof window !== 'undefined' ? sessionStorage.getItem('tx_rl_job_id') : null
-  const [loading, setLoading] = useState(!jobId)
-  const [error, setError] = useState<string | null>(
-    jobId ? null : '找不到訓練 job，請從環境定義頁啟動訓練',
-  )
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [resolvedJobId, setResolvedJobId] = useState<string | null>(jobId)
 
   useEffect(() => {
-    if (!jobId) return
-    fetch(`/api/tx-rl/jobs/${jobId}/result`)
+    if (jobId) return
+    fetch('/api/tx-rl/jobs/latest')
+      .then((r) => {
+        if (r.status === 404) throw new Error('找不到訓練 job，請從環境定義頁啟動訓練')
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
+      .then((d) => {
+        sessionStorage.setItem('tx_rl_job_id', d.job_id)
+        setResolvedJobId(d.job_id)
+      })
+      .catch((e) => {
+        const msg = e instanceof Error ? e.message : String(e)
+        setError(msg)
+        toast.error(msg)
+        setLoading(false)
+      })
+  }, [jobId])
+
+  useEffect(() => {
+    const target = resolvedJobId
+    if (!target) return
+    fetch(`/api/tx-rl/jobs/${target}/result`)
       .then((r) => {
         if (r.status === 404) throw new Error('訓練尚未完成或結果未就緒')
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
@@ -51,7 +71,7 @@ export default function TXRLBacktestPage() {
         toast.error('讀取回測結果失敗', { description: msg })
       })
       .finally(() => setLoading(false))
-  }, [jobId])
+  }, [resolvedJobId])
 
   if (loading) {
     return (
