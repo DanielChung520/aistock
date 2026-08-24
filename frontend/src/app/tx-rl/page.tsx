@@ -10,12 +10,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Bot, Play, Sparkles, History, BarChart3 } from 'lucide-react'
-import { WarningChart } from '@/components/tx-rl/WarningChart'
-import { BlockTitle } from '@/components/tx-rl/HelpButton'
+import { Bot, Play, Sparkles, AlertTriangle, BarChart3, Activity } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { BlockTitle, HelpButton } from '@/components/tx-rl/HelpButton'
 import {
   ACTION_SPACE_MD, REWARD_FUNCTION_MD, STATE_FEATURES_MD,
   ALGORITHM_MD, DATA_RANGE_MD, WALK_FORWARD_MD,
+  WARNING_MD,
 } from '@/components/tx-rl/help-content'
 
 type ActionMode = 'discrete_3' | 'discrete_5' | 'continuous'
@@ -116,25 +118,21 @@ export default function TXRLEnvironmentPage() {
       <Toaster richColors position="top-center" />
       <AppShell title="台指期 RL">
         <div className="flex flex-col h-full min-h-0 gap-4 p-4 lg:p-6">
-          <WarningChart />
-
-          <div className="shrink-0 flex items-center justify-between gap-3">
-            <div>
-              <h1 className="text-lg font-semibold flex items-center gap-2">
-                <Bot className="h-5 w-5 text-muted-foreground" />
-                台指期 RL — 環境定義
-              </h1>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                設定 Action Space、Reward Function、Algorithm 與超參數
-              </p>
+          <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border/60">
+            <div className="flex items-center gap-2 min-w-0">
+              <Bot className="h-5 w-5 text-muted-foreground shrink-0" />
+              <h1 className="text-lg font-semibold whitespace-nowrap">台指期 RL — 環境定義</h1>
+              <WarningIconButton />
+              <InlineLatestStatus />
             </div>
-            <Button onClick={onStart} disabled={submitting}>
-              {submitting ? <Sparkles className="h-4 w-4 mr-1 animate-spin" /> : <Play className="h-4 w-4 mr-1" />}
-              開始訓練
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <LatestResultButtons />
+              <Button onClick={onStart} disabled={submitting} size="sm">
+                {submitting ? <Sparkles className="h-4 w-4 mr-1 animate-spin" /> : <Play className="h-4 w-4 mr-1" />}
+                開始訓練
+              </Button>
+            </div>
           </div>
-
-          <LatestResultCard />
 
           <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 lg:grid-cols-2 gap-4 pb-4">
             <Card>
@@ -363,47 +361,110 @@ export default function TXRLEnvironmentPage() {
    )
 }
 
-function LatestResultCard() {
-  const router = useRouter()
+function useLatestJob() {
   const [latest, setLatest] = useState<{
-    job_id: string; status: string; total_timesteps: number
+    job_id: string; status: string; total_timesteps: number; created_at?: number
   } | null>(null)
-
   useEffect(() => {
     fetch('/api/tx-rl/jobs/latest')
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d?.job_id) setLatest(d) })
       .catch(() => {})
   }, [])
+  return latest
+}
 
-  if (!latest) return null
-
-  const date = new Date((latest as unknown as { created_at?: number }).created_at ? (latest as unknown as { created_at: number }).created_at * 1000 : Date.now())
-
+function WarningIconButton() {
+  const [open, setOpen] = useState(false)
   return (
-    <div className="shrink-0 rounded-lg border border-emerald-500/40 bg-emerald-500/5 px-4 py-3 flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2">
-        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-          <History className="h-3.5 w-3.5" />
-        </span>
-        <div className="text-xs">
-          <div className="font-semibold text-emerald-700 dark:text-emerald-400">
-            最近訓練完成 · {latest.total_timesteps?.toLocaleString() ?? '?'} steps
-          </div>
-          <div className="text-emerald-700/70 dark:text-emerald-400/70">
-            {date.toLocaleString('zh-TW')} · Job {latest.job_id.slice(0, 8)}…
-          </div>
-        </div>
-      </div>
-      <div className="flex gap-2">
-        <Button size="sm" variant="outline" onClick={() => router.push('/tx-rl/backtest')}>
-          查看回測
-        </Button>
-        <Button size="sm" onClick={() => router.push('/tx-rl/evaluation')}>
-          <BarChart3 className="h-3.5 w-3.5 mr-1" />
-          可視化
-        </Button>
-      </div>
-    </div>
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 transition-colors shrink-0"
+        aria-label="學術預期結果警示"
+        title="點擊看警示說明"
+      >
+        <AlertTriangle className="h-3.5 w-3.5" />
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-3 border-b border-amber-500/30 bg-amber-500/5">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <span className="text-amber-700 dark:text-amber-400">學術預期結果（必讀）</span>
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="px-6 py-4 max-h-[70vh]">
+            <div className="text-foreground">
+              {renderMarkdown(WARNING_MD)}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+    </>
   )
+}
+
+function InlineLatestStatus() {
+  const latest = useLatestJob()
+  if (!latest) return null
+  const ts = latest.created_at ? new Date(latest.created_at * 1000) : null
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full shrink-0">
+      <Activity className="h-3 w-3" />
+      最新：{latest.total_timesteps?.toLocaleString() ?? '?'} steps
+      {ts && <span className="text-emerald-700/60">· {ts.toLocaleString('zh-TW', { hour12: false })}</span>}
+    </span>
+  )
+}
+
+function LatestResultButtons() {
+  const router = useRouter()
+  const latest = useLatestJob()
+  if (!latest) return null
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => router.push('/tx-rl/backtest')}>
+        查看回測
+      </Button>
+      <Button size="sm" onClick={() => router.push('/tx-rl/evaluation')}>
+        <BarChart3 className="h-3.5 w-3.5 mr-1" />
+        可視化
+      </Button>
+    </>
+  )
+}
+
+function renderMarkdown(md: string): React.ReactNode {
+  const out: React.ReactNode[] = []
+  const lines = md.split('\n')
+  let k = 0
+  const renderInline = (text: string): React.ReactNode => {
+    const parts: React.ReactNode[] = []
+    let remaining = text
+    let i = 0
+    while (remaining.length > 0) {
+      const boldMatch = remaining.match(/\*\*(.+?)\*\*/)
+      const codeMatch = remaining.match(/`([^`]+)`/)
+      const matches = [
+        boldMatch ? { type: 'b', m: boldMatch, len: boldMatch[0].length } : null,
+        codeMatch ? { type: 'c', m: codeMatch, len: codeMatch[0].length } : null,
+      ].filter(Boolean).sort((a, b) => (a!.m.index! - b!.m.index!))
+      if (matches.length === 0) { parts.push(<span key={i++}>{remaining}</span>); break }
+      const first = matches[0]!
+      if (first.m.index! > 0) parts.push(<span key={i++}>{remaining.slice(0, first.m.index!)}</span>)
+      if (first.type === 'b') parts.push(<strong key={i++} className="font-semibold">{first.m[1]}</strong>)
+      else parts.push(<code key={i++} className="px-1 py-0.5 rounded bg-muted text-[11px] font-mono">{first.m[1]}</code>)
+      remaining = remaining.slice(first.m.index! + first.len)
+    }
+    return <>{parts}</>
+  }
+  for (const line of lines) {
+    if (line.startsWith('### ')) out.push(<h3 key={k++} className="text-sm font-semibold mt-3 mb-1.5">{renderInline(line.slice(4))}</h3>)
+    else if (line.startsWith('## ')) out.push(<h2 key={k++} className="text-base font-bold mt-4 mb-2 border-b border-border/50 pb-1">{renderInline(line.slice(3))}</h2>)
+    else if (line.trim() === '') {}
+    else out.push(<p key={k++} className="text-xs leading-relaxed my-1.5">{renderInline(line)}</p>)
+  }
+  return <div>{out}</div>
 }
