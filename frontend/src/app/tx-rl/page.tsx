@@ -460,9 +460,43 @@ function renderMarkdown(md: string): React.ReactNode {
     }
     return <>{parts}</>
   }
-  for (const line of lines) {
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li]
     if (line.startsWith('### ')) out.push(<h3 key={k++} className="text-sm font-semibold mt-3 mb-1.5">{renderInline(line.slice(4))}</h3>)
     else if (line.startsWith('## ')) out.push(<h2 key={k++} className="text-base font-bold mt-4 mb-2 border-b border-border/50 pb-1">{renderInline(line.slice(3))}</h2>)
+    else if (line.trim().startsWith('- ')) {
+      const items: React.ReactNode[] = []
+      while (li < lines.length && lines[li].trim().startsWith('- ')) {
+        items.push(<li key={k++} className="ml-4 list-disc text-xs leading-relaxed">{renderInline(lines[li].trim().slice(2))}</li>)
+        li++
+      }
+      out.push(<ul key={k++} className="my-1.5 space-y-0.5">{items}</ul>)
+      li--
+    }
+    else if (line.trim().startsWith('|') && li + 1 < lines.length && /^\s*\|[\s\-:|]+\|\s*$/.test(lines[li + 1])) {
+      const parseRow = (s: string) => s.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map((c) => c.trim())
+      const headerCells = parseRow(line)
+      li += 2
+      const bodyRows: string[][] = []
+      while (li < lines.length && lines[li].trim().startsWith('|')) {
+        bodyRows.push(parseRow(lines[li]))
+        li++
+      }
+      out.push(
+        <div key={k++} className="my-2 overflow-x-auto rounded border border-border/60">
+          <table className="w-full text-xs">
+            <thead className="bg-muted/40">
+              <tr>{headerCells.map((h, j) => <th key={j} className="text-left px-2 py-1.5 font-semibold border-b border-border/60">{renderInline(h)}</th>)}</tr>
+            </thead>
+            <tbody>{bodyRows.map((row, ri) => (
+              <tr key={ri} className="border-b border-border/30 last:border-b-0">
+                {row.map((c, j) => <td key={j} className="px-2 py-1.5 align-top">{renderInline(c)}</td>)}</tr>
+            ))}</tbody>
+          </table>
+        </div>,
+      )
+      li--
+    }
     else if (line.trim() === '') {}
     else out.push(<p key={k++} className="text-xs leading-relaxed my-1.5">{renderInline(line)}</p>)
   }
