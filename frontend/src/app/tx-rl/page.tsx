@@ -1,16 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { AppShell } from '@/components/app-shell'
 import { Toaster } from '@/components/ui/sonner'
-import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Bot, Play, Sparkles } from 'lucide-react'
+import { Bot, Play, Sparkles, History, BarChart3 } from 'lucide-react'
 import { WarningChart } from '@/components/tx-rl/WarningChart'
 import { BlockTitle } from '@/components/tx-rl/HelpButton'
 import {
@@ -133,6 +133,8 @@ export default function TXRLEnvironmentPage() {
               開始訓練
             </Button>
           </div>
+
+          <LatestResultCard />
 
           <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 lg:grid-cols-2 gap-4 pb-4">
             <Card>
@@ -350,13 +352,58 @@ export default function TXRLEnvironmentPage() {
                         onChange={(e) => setConfig((p) => ({ ...p, walk_forward: { ...p.walk_forward, [k]: parseInt(e.target.value) || 50 } }))}
                         className="h-8 text-xs" />
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                   ))}
+                 </div>
+               </CardContent>
+             </Card>
+           </div>
+         </div>
+       </AppShell>
+     </>
+   )
+}
+
+function LatestResultCard() {
+  const router = useRouter()
+  const [latest, setLatest] = useState<{
+    job_id: string; status: string; total_timesteps: number
+  } | null>(null)
+
+  useEffect(() => {
+    fetch('/api/tx-rl/jobs/latest')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d?.job_id) setLatest(d) })
+      .catch(() => {})
+  }, [])
+
+  if (!latest) return null
+
+  const date = new Date((latest as unknown as { created_at?: number }).created_at ? (latest as unknown as { created_at: number }).created_at * 1000 : Date.now())
+
+  return (
+    <div className="shrink-0 rounded-lg border border-emerald-500/40 bg-emerald-500/5 px-4 py-3 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+          <History className="h-3.5 w-3.5" />
+        </span>
+        <div className="text-xs">
+          <div className="font-semibold text-emerald-700 dark:text-emerald-400">
+            最近訓練完成 · {latest.total_timesteps?.toLocaleString() ?? '?'} steps
+          </div>
+          <div className="text-emerald-700/70 dark:text-emerald-400/70">
+            {date.toLocaleString('zh-TW')} · Job {latest.job_id.slice(0, 8)}…
           </div>
         </div>
-      </AppShell>
-    </>
+      </div>
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" onClick={() => router.push('/tx-rl/backtest')}>
+          查看回測
+        </Button>
+        <Button size="sm" onClick={() => router.push('/tx-rl/evaluation')}>
+          <BarChart3 className="h-3.5 w-3.5 mr-1" />
+          可視化
+        </Button>
+      </div>
+    </div>
   )
 }
