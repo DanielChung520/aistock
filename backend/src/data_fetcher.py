@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 
+import twstock
 import yfinance as yf
 from arango.exceptions import ArangoError
 
@@ -8,11 +9,27 @@ from src.db import get_db
 
 DAILY_COLLECTION = "stock_daily"
 MINUTE_COLLECTION = "stock_minute_1m"
+MINUTE_15M_COLLECTION = "stock_minute_15m"
 VP_COLLECTION = "stock_vp_daily"
+
+# yfinance hard limit: 15m interval returns at most 60 days of history
+YF_15M_MAX_DAYS = 60
 
 
 def _twse_symbol(symbol: str) -> str:
     """Convert plain Taiwan stock symbol to yfinance format."""
+    return f"{symbol}.TW"
+
+
+def _yf_symbol(symbol: str) -> str:
+    """yfinance ticker with correct exchange suffix (.TW vs .TWO).
+
+    Unlike _twse_symbol, this picks the suffix from twstock, because
+    TPEx (上櫃) stocks only return data under .TWO — .TW is silently empty.
+    """
+    info = twstock.codes.get(symbol)
+    if info is not None and info.market == "上櫃":
+        return f"{symbol}.TWO"
     return f"{symbol}.TW"
 
 
@@ -35,7 +52,7 @@ def _ensure_collections() -> None:
         if ["stock_id", "date"] not in existing:
             col.add_index({"type": "hash", "fields": ["stock_id", "date"], "unique": True})
 
-    for col_name in (MINUTE_COLLECTION,):
+    for col_name in (MINUTE_COLLECTION, MINUTE_15M_COLLECTION):
         if not db.has_collection(col_name):
             col = db.create_collection(col_name)
         else:
@@ -92,10 +109,10 @@ def _store_daily(symbol: str, records: list[dict]) -> None:
             pass
 
 
-def _store_minute(symbol: str, records: list[dict]) -> None:
-    """Upsert minute records into ArangoDB stock_minute_1m collection."""
+def _store_minute(symbol: str, records: list[dict], collection: str = MINUTE_COLLECTION) -> None:
+    """Upsert minute records (1m or 15m) into the given ArangoDB collection."""
     db = get_db()
-    col = db.collection(MINUTE_COLLECTION)
+    col = db.collection(collection)
     for r in records:
         key = f"{symbol}_{r['datetime'].replace(' ', '_').replace(':', '')}"
         doc = {
@@ -112,6 +129,12 @@ def _store_minute(symbol: str, records: list[dict]) -> None:
             col.insert(doc, overwrite=True)
         except ArangoError:
             pass
+
+
+def store_minute_15m(symbol: str, records: list[dict]) -> None:
+    """Upsert 15m bars into ArangoDB stock_minute_15m (public: used by scripts/download_15m.py)."""
+    if records:
+        _store_minute(symbol, records, collection=MINUTE_15M_COLLECTION)
 
 
 # ── Daily history ─────────────────────────────────────────────
@@ -281,6 +304,69 @@ def fetch_minute_history(
 def fetch_minute_raw(symbol: str, days: int = 7) -> list[dict]:
     """Fetch raw 1m data (for indicator calculations)."""
     return fetch_minute_history(symbol, interval="1m", days=days)
+
+
+# ── 15m history (dedicated stock_minute_15m dataset) ───────────
+
+def fetch_15m_history(symbol: str, days: int = YF_15M_MAX_DAYS) -> list[dict]:
+    """Cache-through fetch of 15m bars into stock_minute_15m.
+
+    days is clamped to YF_15M_MAX_DAYS (60) — yfinance returns nothing beyond that
+    for interval="15m". Freshness rule mirrors fetch_minute_history: refetch when
+    the latest cached bar is older than 1 hour.
+    """
+    _ensure_collections()
+    db = get_db()
+    days = max(1, min(days, YF_15M_MAX_DAYS))
+    # yfinance rejects any 15m range > 60 days; end is exclusive (today+1),
+    # so start must be today-(days-1) to keep the range within `days`.
+    start_str = (date.today() - timedelta(days=days - 1)).isoformat()
+
+    aql = """
+    FOR d IN stock_minute_15m
+      FILTER d.stock_id == @symbol AND d.datetime >= @start
+      SORT d.datetime ASC
+      RETURN { datetime: d.datetime, open: d.open, high: d.high, low: d.low, close: d.close, volume: d.volume }
+    """
+    cursor = db.aql.execute(aql, bind_vars={"symbol": symbol, "start": start_str})
+    cached = list(cursor)
+
+    stale_before = (datetime.now() - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+    if cached and cached[-1]["datetime"] >= stale_before:
+        return cached
+
+    ticker = yf.Ticker(_yf_symbol(symbol))
+    hist = ticker.history(
+        start=start_str,
+        end=(date.today() + timedelta(days=1)).isoformat(),
+        interval="15m",
+        auto_adjust=False,
+    )
+    if hist.empty:
+        return cached
+
+    yf_records = []
+    for dt, row in hist.iterrows():
+        close_val = float(row["Close"])
+        if close_val != close_val:
+            continue
+        yf_records.append({
+            "datetime": dt.strftime("%Y-%m-%d %H:%M:%S"),
+            "open": round(float(row["Open"]), 2),
+            "high": round(float(row["High"]), 2),
+            "low": round(float(row["Low"]), 2),
+            "close": round(close_val, 2),
+            "volume": int(row["Volume"]),
+        })
+
+    cached_dts = {r["datetime"] for r in cached}
+    new_records = [r for r in yf_records if r["datetime"] not in cached_dts]
+    if new_records:
+        store_minute_15m(symbol, new_records)
+
+    merged = list(cached)
+    merged.extend(new_records)
+    return merged
 
 
 # ── History cleanup (for scheduled maintenance tasks) ─────────
