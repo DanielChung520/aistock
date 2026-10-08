@@ -144,14 +144,20 @@ def _validate_conditions(conditions: list[dict]) -> list[dict]:
                 pass
             else:
                 continue
-        valid.append(
-            {
-                "metric": metric,
-                "op": op,
-                "value": value,
-                "note": str(cond.get("note", ""))[:80] or metric,
-            }
-        )
+        tf = cond.get("tf")
+        if tf not in (None, "d", "w", "15m", "D", "W", "15M"):
+            tf = "d"
+        if isinstance(tf, str):
+            tf = tf.lower()
+        c = {
+            "metric": metric,
+            "op": op,
+            "value": value,
+            "note": str(cond.get("note", ""))[:80] or metric,
+        }
+        if tf:
+            c["tf"] = tf
+        valid.append(c)
     return valid
 
 
