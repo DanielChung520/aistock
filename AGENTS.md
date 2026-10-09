@@ -22,7 +22,8 @@ aiStock/
 │   │   │       ├── stocks/[...path]/  # → /api/stocks/*
 │   │   │       ├── market/[...path]/  # → /api/market/*
 │   │   │       ├── watchlist/         # → /api/watchlist
-│   │   │       └── menu/             # Menu CRUD (Phase 1, direct ArangoDB)
+│   │   │       ├── menu/             # Menu CRUD (Phase 1, direct ArangoDB)
+│   │   │       └── docs/[...key]/    # GET /api/docs/<key> → SeaweedFS aistock-reports (ow 報告連結)
 │   │   ├── components/
 │   │   │   ├── stocks/          # Stock UI components (7 files)
 │   │   │   ├── sidebar-nav.tsx  # Dynamic sidebar (Phase 1)
@@ -248,3 +249,4 @@ Next.js (port 33300) → API routes (proxy) → FastAPI (port 38000) → twstock
 - **G10**: Indicator settings stored in localStorage key `aistock-indicator-settings` with versioned schema.
 - **G11**: Use lightweight-charts v5 native pane API (`addSeries(type, opts, paneIndex)`). Do NOT create multiple chart instances.
 - **G12**: Minute-data indicators use same calculation functions as daily.
+- **G15**: 右下角 ow「AI 助手」以 `analyst` agent 執行（ow config `~/.config/ow/default/opencode/opencode.json` 的 `default_agent`）。對 aistock repo **唯讀**：`edit`（涵蓋 `edit`/`write`/`patch`）全 `deny`，僅暫存區 `~/.config/ow/default/.tmp/aistock/**` 可寫（需同時 `external_directory` allow）。分析師**腳本優先**——可重用腳本放 `~/.config/ow/default/.tmp/aistock/scripts/`（`screen.sh` / `activity.sh` / `upload_report.py`），產出 HTML 報告上傳 SeaweedFS bucket `aistock-reports`，並以 `https://stk.k84.org/api/docs/<key>` 回覆連結（前端 proxy `frontend/src/app/api/docs/[...key]/route.ts` → filer `:8888/buckets/aistock-reports/<key>`；env `SEAWEEDFS_FILER_URL` / `SEAWEEDFS_REPORT_BUCKET`）。全體 agent 政策檔為 `~/.config/ow/default/opencode/policy/AGENT-POLICY.md`，由 ow 專屬 Hermes 記憶（`~/.config/ow/default/opencode/hermes/memory/`）監督。
