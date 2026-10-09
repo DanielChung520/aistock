@@ -56,6 +56,9 @@ function dedupe<T extends { time: unknown }>(arr: T[]): T[] {
   })
 }
 
+// 初始檢視窗為最近 6 個月；完整歷史仍會載入/快取並可向左捲動檢視，勿改為截斷資料。
+const DEFAULT_VIEW_MONTHS = 6
+
 export function MultiPaneChart({
   data,
   indicators,
@@ -67,6 +70,10 @@ export function MultiPaneChart({
   const containerRef = useRef<HTMLDivElement>(null)
   const settingsRef = useRef(settings)
   const indicatorsRef = useRef(indicators)
+  // 記住目前可視範圍（logical index），供圖表重建（指標開關、尺寸變更）時沿用；
+  // 換股或重新抓取資料（dataKey 改變）時才回到預設檢視窗。
+  const lastRangeRef = useRef<{ from: number; to: number } | null>(null)
+  const prevDataKeyRef = useRef<string | null>(null)
   const [measuredHeight, setMeasuredHeight] = useState<number | null>(null)
   const [measuredWidth, setMeasuredWidth] = useState<number | null>(null)
 
@@ -336,11 +343,42 @@ export function MultiPaneChart({
       nextPane++
     }
 
-    // Fit time scale to data so candles fill the full chart width.
-    // Without this, lightweight-charts may show only the visible range's
-    // most-recent portion when the data range is wider than the visible
-    // window (e.g. switching from 6mo to 1yr leaves a gap on the right).
-    chart.timeScale().fitContent()
+    // 預設檢視窗：日 K 只顯示最近 DEFAULT_VIEW_MONTHS 個月，完整歷史仍在快取中，
+    // 向左捲動即可看到。由指標開關/尺寸變更觸發的重建會保留使用者當前視窗；
+    // 換股或重新抓取（dataKey 改變）才回到預設（分 K 則 fit 全部已載入資料）。
+    const dataKey =
+      data.length > 0 ? `${data.length}|${data[0].date}|${data[data.length - 1].date}` : 'empty'
+    const sameDataset = prevDataKeyRef.current === dataKey
+    prevDataKeyRef.current = dataKey
+
+    const applyDefaultViewport = () => {
+      if (isMinuteData) {
+        chart.timeScale().fitContent()
+        return
+      }
+      const lastIdx = data.length - 1
+      const lastDate = new Date(data[lastIdx].date)
+      const cutoff = new Date(lastDate)
+      cutoff.setMonth(cutoff.getMonth() - DEFAULT_VIEW_MONTHS)
+      let startIdx = data.findIndex((d) => new Date(d.date) >= cutoff)
+      if (startIdx < 0) startIdx = 0
+      chart.timeScale().setVisibleLogicalRange({ from: startIdx, to: lastIdx })
+    }
+
+    const savedRange = lastRangeRef.current
+    if (sameDataset && savedRange && savedRange.to - savedRange.from >= 1) {
+      chart.timeScale().setVisibleLogicalRange({ from: savedRange.from, to: savedRange.to })
+    } else {
+      applyDefaultViewport()
+    }
+
+    // 記住使用者目前的可視範圍，供下次重建沿用。
+    const handleVisibleRangeChange = (range: { from: number; to: number } | null) => {
+      if (range && Number.isFinite(range.from) && Number.isFinite(range.to)) {
+        lastRangeRef.current = { from: range.from, to: range.to }
+      }
+    }
+    chart.timeScale().subscribeVisibleLogicalRangeChange(handleVisibleRangeChange)
 
     const panes = chart.panes()
     if (panes.length > 0) {
@@ -481,6 +519,7 @@ export function MultiPaneChart({
 
     return () => {
       window.removeEventListener('resize', handleResize)
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(handleVisibleRangeChange)
       chart.remove()
       overlayEl.remove()
       subOverlays.forEach((el) => el.remove())
