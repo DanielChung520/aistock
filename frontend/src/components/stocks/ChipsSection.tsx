@@ -135,6 +135,7 @@ export function ChipsSection({ stockId }: { stockId: string }) {
       layout: {
         background: { color: 'transparent' },
         textColor: 'hsl(var(--muted-foreground))',
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: 'hsl(var(--border))' },
@@ -206,6 +207,7 @@ export function ChipsSection({ stockId }: { stockId: string }) {
       layout: {
         background: { color: 'transparent' },
         textColor: 'hsl(var(--muted-foreground))',
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: 'hsl(var(--border))' },
