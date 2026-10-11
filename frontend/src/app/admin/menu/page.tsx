@@ -16,12 +16,26 @@ import { IconPicker } from '@/components/ui/icon-picker'
 import { iconMap, getIconComponent } from '@/lib/icon-map'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { toast } from 'sonner'
-import { MenuItem, MenuGroup, MenuItemWithChildren } from '@/types/menu'
+import { MenuItem, MenuGroup, MenuItemWithChildren, MarketIndex, IndexCategory } from '@/types/menu'
+
+const CATEGORY_LABELS: IndexCategory[] = ['台股', '亞股', '美股']
 
 export default function MenuAdminPage() {
   const [loading, setLoading] = useState(true)
   const [menuData, setMenuData] = useState<MenuGroup[]>([])
   const [allGroups, setAllGroups] = useState<{ _key: string; title: string; sortOrder: number; enabled: boolean }[]>([])
+  const [indices, setIndices] = useState<MarketIndex[]>([])
+
+  const [isIndexModalOpen, setIsIndexModalOpen] = useState(false)
+  const [editingIndex, setEditingIndex] = useState<MarketIndex | null>(null)
+  const [indexForm, setIndexForm] = useState({
+    symbol: '',
+    yfSymbol: '',
+    name: '',
+    category: '美股' as IndexCategory,
+    enabled: true,
+    sortOrder: 0,
+  })
 
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false)
   const [editingGroup, setEditingGroup] = useState<{ _key: string; title: string; sortOrder: number; enabled: boolean } | null>(null)
@@ -45,19 +59,23 @@ export default function MenuAdminPage() {
   const fetchData = async () => {
     setLoading(true)
     try {
-      const [menuRes, groupsRes] = await Promise.all([
+      const [menuRes, groupsRes, indicesRes] = await Promise.all([
         fetch('/api/menu'),
-        fetch('/api/menu/groups')
+        fetch('/api/menu/groups'),
+        fetch('/api/market-indices')
       ])
       
       if (!menuRes.ok) throw new Error('Failed to fetch menu data')
       if (!groupsRes.ok) throw new Error('Failed to fetch groups data')
+      if (!indicesRes.ok) throw new Error('Failed to fetch market indices')
 
       const menuData = await menuRes.json()
       const groupsData = await groupsRes.json()
+      const indicesData = await indicesRes.json()
 
       setMenuData(menuData.menu || [])
       setAllGroups(groupsData || [])
+      setIndices(indicesData.indices || [])
     } catch (error) {
       toast.error('Error fetching data')
       console.error(error)
@@ -163,6 +181,85 @@ export default function MenuAdminPage() {
     }
   }
 
+  const handleSaveIndex = async () => {
+    if (!indexForm.symbol.trim()) {
+      toast.error('請輸入指數代號')
+      return
+    }
+
+    try {
+      const method = editingIndex ? 'PUT' : 'POST'
+      const body = editingIndex
+        ? { _key: editingIndex._key, ...indexForm }
+        : { ...indexForm, symbol: indexForm.symbol.trim().toUpperCase() }
+
+      const res = await fetch('/api/market-indices', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (!res.ok) throw new Error('Failed to save index')
+
+      toast.success(editingIndex ? '指數已更新' : '指數已新增')
+      setIsIndexModalOpen(false)
+      fetchData()
+    } catch (error) {
+      toast.error('儲存指數失敗')
+    }
+  }
+
+  const handleDeleteIndex = async (key: string) => {
+    if (!window.confirm('確定要刪除此指數？')) return
+
+    try {
+      const res = await fetch(`/api/market-indices?key=${key}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete index')
+
+      toast.success('指數已刪除')
+      fetchData()
+    } catch (error) {
+      toast.error('刪除指數失敗')
+    }
+  }
+
+  const updateIndexSort = async (key: string, newOrder: number) => {
+    try {
+      await fetch('/api/market-indices', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ _key: key, sortOrder: newOrder }),
+      })
+      fetchData()
+    } catch (error) {
+      toast.error('排序更新失敗')
+    }
+  }
+
+  const openIndexModal = (index: MarketIndex | null = null) => {
+    setEditingIndex(index)
+    if (index) {
+      setIndexForm({
+        symbol: index.symbol,
+        yfSymbol: index.yfSymbol,
+        name: index.name,
+        category: index.category,
+        enabled: index.enabled,
+        sortOrder: index.sortOrder,
+      })
+    } else {
+      setIndexForm({
+        symbol: '',
+        yfSymbol: '',
+        name: '',
+        category: '美股',
+        enabled: true,
+        sortOrder: indices.length,
+      })
+    }
+    setIsIndexModalOpen(true)
+  }
+
   const updateGroupSort = async (key: string, newOrder: number) => {
     try {
       await fetch('/api/menu/groups', {
@@ -248,11 +345,10 @@ export default function MenuAdminPage() {
   }
 
   return (
-    <AppShell>
-      <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
-        <h1 className="text-2xl font-bold tracking-tight">選單管理</h1>
-
-      <Card>
+    <AppShell title="選單管理">
+      <div className="h-full overflow-auto">
+        <div className="p-4 md:p-6 space-y-6">
+          <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Menu Groups</CardTitle>
           <Button onClick={() => openGroupModal()}>
@@ -445,6 +541,95 @@ export default function MenuAdminPage() {
         </Card>
       ))}
 
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>指數清單（市場環境）</CardTitle>
+          <Button onClick={() => openIndexModal()}>
+            <Plus className="mr-2 h-4 w-4" /> 新增指數
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">順序</TableHead>
+                <TableHead>代號</TableHead>
+                <TableHead>yfinance</TableHead>
+                <TableHead>名稱</TableHead>
+                <TableHead>類別</TableHead>
+                <TableHead>啟用</TableHead>
+                <TableHead className="text-right">操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {indices.map((index, i) => (
+                <TableRow key={index._key}>
+                  <TableCell>
+                    <div className="flex flex-col items-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => updateIndexSort(index._key!, index.sortOrder - 1)}
+                        disabled={i === 0}
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </Button>
+                      <Badge variant="outline">{index.sortOrder}</Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => updateIndexSort(index._key!, index.sortOrder + 1)}
+                        disabled={i === indices.length - 1}
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-mono font-medium">{index.symbol}</TableCell>
+                  <TableCell className="font-mono text-muted-foreground text-sm">{index.yfSymbol}</TableCell>
+                  <TableCell className="font-medium">{index.name}</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{index.category}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={index.enabled}
+                      onCheckedChange={(checked) => {
+                        fetch('/api/market-indices', {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ _key: index._key, enabled: checked }),
+                        }).then(() => fetchData()).catch(() => toast.error('更新指數狀態失敗'))
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell className="text-right space-x-2">
+                    <Button variant="outline" size="icon" onClick={() => openIndexModal(index)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="destructive" size="icon" onClick={() => handleDeleteIndex(index._key!)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {indices.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    尚無指數，請點擊「新增指數」。
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+          <p className="mt-3 text-xs text-muted-foreground">
+            此清單供市場指數下載使用（回補 2 年 + 每日增量）。yfinance 代號範例：^TWII、^TWO、^N225、^HSI、000001.SS、^KS11、^SOX、^IXIC、^GSPC、^DJI。
+          </p>
+        </CardContent>
+      </Card>
+
       <Dialog open={isGroupModalOpen} onOpenChange={setIsGroupModalOpen}>
         <DialogContent>
           <DialogHeader>
@@ -600,7 +785,85 @@ export default function MenuAdminPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+
+      <Dialog open={isIndexModalOpen} onOpenChange={setIsIndexModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingIndex ? '編輯指數' : '新增指數'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="index-symbol">指數代號（唯一）</Label>
+              <Input
+                id="index-symbol"
+                placeholder="TWII"
+                value={indexForm.symbol}
+                disabled={!!editingIndex}
+                onChange={(e) => setIndexForm({ ...indexForm, symbol: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="index-yf-symbol">yfinance 代號</Label>
+              <Input
+                id="index-yf-symbol"
+                placeholder="^TWII"
+                value={indexForm.yfSymbol}
+                onChange={(e) => setIndexForm({ ...indexForm, yfSymbol: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="index-name">名稱</Label>
+              <Input
+                id="index-name"
+                placeholder="加權指數"
+                value={indexForm.name}
+                onChange={(e) => setIndexForm({ ...indexForm, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="index-category">類別</Label>
+              <Select
+                value={indexForm.category}
+                onValueChange={(val) => setIndexForm({ ...indexForm, category: val as IndexCategory })}
+              >
+                <SelectTrigger id="index-category">
+                  <SelectValue placeholder="選擇類別" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORY_LABELS.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="index-sort">排序</Label>
+              <Input
+                id="index-sort"
+                type="number"
+                value={indexForm.sortOrder}
+                onChange={(e) => setIndexForm({ ...indexForm, sortOrder: parseInt(e.target.value) || 0 })}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="index-enabled">啟用</Label>
+              <Switch
+                id="index-enabled"
+                checked={indexForm.enabled}
+                onCheckedChange={(c) => setIndexForm({ ...indexForm, enabled: c })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsIndexModalOpen(false)}>取消</Button>
+            <Button onClick={handleSaveIndex}>儲存</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+        </div>
+      </div>
     </AppShell>
   )
 }

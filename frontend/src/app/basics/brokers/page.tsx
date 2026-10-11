@@ -70,15 +70,12 @@ export default function BrokersPage() {
   }, [brokers, searchQuery])
 
   return (
-    <AppShell>
-      <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-4 md:space-y-6">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0 mb-2 md:mb-6">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold">券商資訊</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              {loading ? '載入中...' : `共 ${total} 家券商`}
-            </p>
-          </div>
+    <AppShell title="券商資訊">
+      <div className="h-full flex flex-col p-4 md:p-6 gap-4 md:gap-6">
+        <div className="shrink-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">
+            {loading ? '載入中...' : `共 ${total} 家券商`}
+          </p>
 
           <div className="relative w-full md:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -92,7 +89,7 @@ export default function BrokersPage() {
         </div>
 
         {error && (
-          <Card className="border-destructive/50 bg-destructive/10">
+          <Card className="shrink-0 border-destructive/50 bg-destructive/10">
             <CardContent className="p-6 flex flex-col items-center justify-center text-center">
               <p className="text-destructive font-medium">{error}</p>
             </CardContent>
@@ -100,7 +97,7 @@ export default function BrokersPage() {
         )}
 
         {loading && !error && (
-          <Card>
+          <Card className="shrink-0">
             <CardContent className="space-y-3 py-6">
               {Array.from({ length: 8 }).map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />
@@ -110,9 +107,9 @@ export default function BrokersPage() {
         )}
 
         {!loading && !error && (
-          <Card>
-            <CardContent className="p-0 md:p-6 md:pt-6">
-              <div className="overflow-x-auto">
+          <Card className="flex-1 min-h-0 gap-0 overflow-hidden">
+            <CardContent className="p-0 flex-1 min-h-0 flex flex-col">
+              <div className="overflow-auto flex-1 min-h-0">
                 <Table>
                   <TableHeader>
                     <TableRow>

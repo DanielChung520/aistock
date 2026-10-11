@@ -5,7 +5,7 @@ import { WatchlistManager } from '@/components/watchlist-manager'
 
 export default function WatchlistPage() {
   return (
-    <AppShell>
+    <AppShell title="自選股管理">
       <WatchlistManager />
     </AppShell>
   )

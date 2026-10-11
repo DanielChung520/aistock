@@ -14,7 +14,7 @@ export function WatchlistModal() {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
-      <DialogContent className="w-[95vw] max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>自選股管理</DialogTitle>
         </DialogHeader>
