@@ -1,16 +1,52 @@
 import ssl
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from fastapi import APIRouter, Query
 
-from src.indicators import calculate_bollinger, calculate_kdj, calculate_ma, calculate_macd, calculate_rsi
+from src.indicators import (
+    calculate_bollinger,
+    calculate_kdj,
+    calculate_ma_daniel,
+    calculate_macd,
+    calculate_rsi,
+    calculate_signal_accuracy,
+)
 
 router = APIRouter(prefix="/market", tags=["market"])
 
 # TWSE 的 SSL 憑證缺少 Subject Key Identifier，Python 3.14+ 預設會拒絕
 # 建立寬鬆的 SSL context 來繞過此問題
 _twse_ssl_ctx: ssl.SSLContext | None = None
+
+# taiex 資料記憶體快取：TWSE 外部 API 延遲高（實測 ~5s），
+# 且盤中資料每 5 分鐘內變化極小，比照 basics.py 的 cache pattern 避免每次打外部 API
+_TAIEX_CACHE_TTL_SECONDS = 300
+_taiex_cache: dict[int, dict[str, object]] = {}
+
+
+def _is_taiex_cache_valid(cached_at: float) -> bool:
+    return (datetime.now(timezone.utc).timestamp() - cached_at) < _TAIEX_CACHE_TTL_SECONDS
+
+
+async def _get_taiex_cached(months: int) -> dict[str, object]:
+    entry = _taiex_cache.get(months)
+    if entry:
+        cached_at_raw = entry.get("cached_at")
+        cached_at = float(cached_at_raw) if isinstance(cached_at_raw, int | float) else 0.0
+        if _is_taiex_cache_valid(cached_at):
+            data = entry.get("data")
+            if isinstance(data, dict):
+                return data
+
+    data = await _fetch_taiex_data(months=months)
+    # 失敗時不回存（避免把 error 塞進 cache 讓使用者看 5 分鐘錯誤）
+    if "error" not in data:
+        _taiex_cache[months] = {
+            "cached_at": datetime.now(timezone.utc).timestamp(),
+            "data": data,
+        }
+    return data
 
 
 def _get_twse_ssl_context() -> ssl.SSLContext:
@@ -107,14 +143,18 @@ async def _fetch_taiex_data(months: int = 2) -> dict[str, object]:
 async def get_taiex(
     months: int = Query(default=2, ge=1, le=120),
 ) -> dict[str, object]:
-    return await _fetch_taiex_data(months=months)
+    return await _get_taiex_cached(months=months)
 
 
 @router.get("/taiex/indicators")
 async def get_taiex_indicators(
     months: int = Query(default=6, ge=1, le=120),
-    ma_periods: str = Query(default="5,10,20,60"),
+    ma_periods: str = Query(default="8,21,55,89"),
     ma_type: str = Query(default="sma"),
+    ma_lookback: int = Query(default=8, ge=1, le=250),
+    ma_cooldown: int = Query(default=1, ge=0, le=50),
+    ma_buy_slope_min: float = Query(default=0.05, ge=0.0, le=10.0),
+    ma_sell_slope_max: float = Query(default=0.02, ge=0.0, le=10.0),
     kdj_period: int = Query(default=9, ge=2, le=250),
     rsi_period: int = Query(default=14, ge=2, le=250),
     macd_fast: int = Query(default=12, ge=2, le=250),
@@ -126,7 +166,7 @@ async def get_taiex_indicators(
     if ma_type not in ("sma", "ema"):
         return {"error": "ma_type must be 'sma' or 'ema'"}
 
-    result = await _fetch_taiex_data(months=months)
+    result = await _get_taiex_cached(months=months)
     data = result.get("data", [])
     if not isinstance(data, list) or len(data) == 0:
         return {"ma": [], "kdj": [], "rsi": [], "macd": [], "bollinger": []}
@@ -135,15 +175,31 @@ async def get_taiex_indicators(
     closes = [float(item["close"]) for item in data]
     highs = [float(item["high"]) for item in data]
     lows = [float(item["low"]) for item in data]
+    volumes = [float(item.get("volume") or 0) for item in data]
 
     periods = [int(p.strip()) for p in ma_periods.split(",") if p.strip().isdigit()]
     if not periods:
-        periods = [5, 10, 20, 60]
+        periods = [8, 21, 55, 89]
+
+    ma_all = calculate_ma_daniel(
+        dates,
+        highs,
+        lows,
+        closes,
+        volumes,
+        periods=periods,
+        lookback=ma_lookback,
+        ma_type=ma_type,
+        cooldown=ma_cooldown,
+        buy_slope_min=ma_buy_slope_min,
+        sell_slope_max=ma_sell_slope_max,
+    )
 
     return {
-        "ma": calculate_ma(dates, closes, periods, ma_type),
+        "ma": ma_all,
         "kdj": calculate_kdj(dates, highs, lows, closes, kdj_period),
         "rsi": calculate_rsi(dates, closes, rsi_period),
         "macd": calculate_macd(dates, closes, macd_fast, macd_slow, macd_signal),
         "bollinger": calculate_bollinger(dates, closes, bb_period, bb_std),
+        "ma_accuracy": calculate_signal_accuracy(ma_all, highs, lows, closes),
     }
