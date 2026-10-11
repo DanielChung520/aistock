@@ -43,12 +43,14 @@ jobs:
           python -m zipfile -e "$RT_WIN/arango.zip" "$RT_WIN"
           ARANGO_BIN_UNIX=$(find "$RT_UNIX" -name arangod.exe | head -1)
           ARANGO_BIN=$(cygpath -w "$ARANGO_BIN_UNIX")
-          ARANGO_HOME=$(dirname "$(dirname "$ARANGO_BIN")")
+          # Windows zip 的 js 目錄在 <root>/usr/share/arangodb3/js，動態找避免硬編
+          JS_DIR_UNIX=$(find "$RT_UNIX" -type d -path "*share/arangodb3/js" | head -1)
+          JS_DIR=$(cygpath -w "$JS_DIR_UNIX")
           mkdir -p "$RT_WIN/arango-data" "$RT_WIN/arango-apps"
           "$ARANGO_BIN" --server.endpoint tcp://127.0.0.1:8530 \
             --database.directory "$RT_WIN/arango-data" \
             --server.authentication false \
-            --javascript.startup-directory "$ARANGO_HOME/js" \
+            --javascript.startup-directory "$JS_DIR" \
             --javascript.app-path "$RT_WIN/arango-apps" &
           ARANGO_PID=$!
           trap 'kill ${BACKEND_PID:-} ${ARANGO_PID:-} 2>/dev/null || true' EXIT

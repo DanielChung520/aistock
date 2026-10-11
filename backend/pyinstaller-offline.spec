@@ -23,7 +23,16 @@ _COLLECT_PKGS = [
 # xgboost/lightgbm 的 testing 子模組在 import 時會丟 pytest.Skipped（BaseException，
 # 非 Exception），collect_submodules 的 on_error="warn" 接不住 → 不放進 collect；
 # 其原生 lib 由 PyInstaller 官方 hook 處理，把套件根加進 hiddenimports 即可。
-hiddenimports = ["xgboost", "lightgbm"]
+# src.data 由 modulegraph 解析時曾漏包（執行期 ModuleNotFoundError），force 進來。
+hiddenimports = [
+    "xgboost",
+    "lightgbm",
+    "src.data",
+    "src.data.tx_fetcher",
+    "src.data.tx_aggregator",
+    "src.data.cross_market",
+    "src.data.market_features",
+]
 for _p in _COLLECT_PKGS:
     try:
         hiddenimports += collect_submodules(_p, on_error="warn")
