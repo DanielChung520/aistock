@@ -24,7 +24,9 @@ _COLLECT_PKGS = [
 
 hiddenimports = []
 for _p in _COLLECT_PKGS:
-    hiddenimports += collect_submodules(_p)
+    # on_error="warn": 選用子模組（如 celery.security 需 cryptography）缺依賴時
+    # 跳過而非中止整個打包
+    hiddenimports += collect_submodules(_p, on_error="warn")
 
 datas = []
 for _p in ("sklearn", "xgboost", "lightgbm", "celery", "yfinance"):
