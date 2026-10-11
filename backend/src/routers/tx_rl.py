@@ -13,7 +13,6 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from src.celery_app import celery_app
-from src.tasks.tx_rl_training import train_tx_rl_agent_task
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +72,9 @@ def start_training(req: StartRunRequest) -> dict:
         "config": req.config,
         "created_at": int(time.time()),
     })
+    # 離線版排除 torch：stable-baselines3 在 module import 時會拉 torch，
+    # 故延遲到真正呼叫訓練時才 import（線上版行為不變）。
+    from src.tasks.tx_rl_training import train_tx_rl_agent_task
     train_tx_rl_agent_task.delay(job_id, req.config)
     return {"job_id": job_id, "status": "pending"}
 

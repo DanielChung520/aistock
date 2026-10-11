@@ -1,0 +1,68 @@
+name: Build Offline
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/build-offline.yml'
+
+jobs:
+  backend-sidecar:
+    name: Backend Sidecar (PyInstaller + smoke)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps (offline set, no torch)
+        shell: bash
+        run: |
+          grep -v -E '^torch==|^stable-baselines3' requirements.txt > requirements-offline.txt
+          pip install -r requirements-offline.txt
+          pip install pyinstaller
+      - name: PyInstaller build
+        run: pyinstaller pyinstaller-offline.spec --noconfirm --clean
+      - name: Smoke test (arangod 3.11.14 + backend /health)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # ArangoDB 3.12+ 不再出 Windows 套件，3.11.14 是最後一版（EOL，僅離線版使用）
+          curl -sL -o "$RUNNER_TEMP/arango.zip" \
+            "https://download.arangodb.com/arangodb311/Community/Windows/ArangoDB3-3.11.14_win64.zip"
+          tar -xf "$RUNNER_TEMP/arango.zip" -C "$RUNNER_TEMP"
+          ARANGO_BIN=$(find "$RUNNER_TEMP" -name arangod.exe | head -1)
+          ARANGO_HOME=$(dirname "$(dirname "$ARANGO_BIN")")
+          mkdir -p "$RUNNER_TEMP/arango-data" "$RUNNER_TEMP/arango-apps"
+          "$ARANGO_BIN" --server.endpoint tcp://127.0.0.1:8530 \
+            --database.directory "$RUNNER_TEMP/arango-data" \
+            --server.authentication false \
+            --javascript.startup-directory "$ARANGO_HOME/js" \
+            --javascript.app-path "$RUNNER_TEMP/arango-apps" &
+          ARANGO_PID=$!
+          trap 'kill ${BACKEND_PID:-} ${ARANGO_PID:-} 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            curl -sf "http://127.0.0.1:8530/_api/version" >/dev/null 2>&1 && break
+            sleep 2
+          done
+          ./dist/aistock-backend/aistock-backend.exe &
+          BACKEND_PID=$!
+          for i in $(seq 1 60); do
+            if curl -sf "http://127.0.0.1:38000/health"; then
+              echo "BACKEND_HEALTH_OK"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "backend /health timeout"
+          exit 1
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aistock-backend-sidecar
+          path: backend/dist/aistock-backend/

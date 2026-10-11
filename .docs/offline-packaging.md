@@ -42,6 +42,7 @@ aistock-setup.exe (Tauri Rust shell)
   - `hiddenimports`：`celery`、`duckdb`、`xgboost`、`lightgbm`、`sklearn`、`yfinance`、`twstock`、`python_arango`
   - `excludes`：`torch`、`torchvision`、`torchaudio`
   - 產物 `dist/aistock-backend/`（exe + `_internal/`）→ 放入 `frontend/src-tauri/binaries/`
+- 前置必要修改（已完成）：`src/routers/tx_rl.py` 對 `tasks/tx_rl_training` 的 import 改為 **lazy** —— 切斷 stable-baselines3 → torch 的 top-level 依賴；否則排除 torch 後啟動即崩（`tx_rl_training.py` 是啟動鏈外唯一還 top-level import sb3 的模組）。
 - 啟動：`aistock-backend.exe --host 127.0.0.1 --port 38000`
 - 健康檢查：`GET http://127.0.0.1:38000/health`
 - Arango：離線 `arangod` 用 `--server.authentication false`（僅綁 127.0.0.1），backend 的 root/aistock2024 照舊可連。
@@ -60,7 +61,9 @@ aistock-setup.exe (Tauri Rust shell)
 
 ## 7. Phase 3 — ArangoDB
 
-- 下載 Windows community **zip（免安裝）** → `frontend/src-tauri/resources/arangodb/`
+- 下載 Windows community **zip（免安裝）**：**`ArangoDB3-3.11.14_win64.zip`**
+  （`https://download.arangodb.com/arangodb311/Community/Windows/`；**3.12+ 不再提供 Windows 套件**，
+  3.11 為最後一版、已 EOL——僅離線版使用且固定綁 127.0.0.1）→ `frontend/src-tauri/resources/arangodb/`
 - 啟動（僅綁 127.0.0.1）：
   ```
   arangod --server.endpoint tcp://127.0.0.1:8530 \
@@ -96,6 +99,7 @@ aistock-setup.exe (Tauri Rust shell)
 
 | 風險 | 對策 |
 |---|---|
+| ArangoDB 3.11 已 EOL（Windows 最後一版） | 僅離線版、綁 127.0.0.1、固定 3.11.14；日後可評估嵌入式替代 |
 | PyInstaller 對 duckdb/xgboost/lightgbm/celery 的 hidden import 漏包 | CI 上 smoke test 啟動 backend + `/health`，iterative 補 `hiddenimports` |
 | arangod 首啟資料目錄/DB 初始化 | Phase 3 實作時在 CI 驗證 `ensure_database()` |
 | Node runtime 授權/大小 | MIT 授權 OK；~40MB 可接受 |
@@ -112,7 +116,7 @@ aistock-setup.exe (Tauri Rust shell)
 
 ## 12. 里程碑（建議順序）
 
-1. **M1**：Phase 1 backend sidecar（CI 產出 + `/health` smoke）— 獨立可驗證
+1. **M1（✅ 已交付）**：Phase 1 backend sidecar — `offline_entry.py` + `pyinstaller-offline.spec` + `build-offline.yml`（Windows CI 建置 + arangod 3.11.14 smoke `/health`）
 2. **M2**：Phase 2 Next standalone + node（CI 產出 + 本機/CI 起 server）
 3. **M3**：Phase 3 arangod 打包 + 首啟建 DB
 4. **M4**：Phase 4 Tauri 三程序編排 + 離線 config
