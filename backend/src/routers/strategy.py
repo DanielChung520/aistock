@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 
+import twstock
 from arango.database import StandardDatabase
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -11,7 +12,8 @@ from pydantic import BaseModel, Field
 from src.db import get_db
 from src.indicator_rag import format_evidence, get_rag
 from src.llm import chat_completion, chat_completion_with_fallback, extract_json_object
-from src.strategy import ALLOWED_OPS, CATALOG_TEXT, evaluate_stock
+from src.strategy import ALLOWED_OPS, CATALOG_TEXT, INDICATOR_CATALOG, evaluate_stock
+from src.strategy_script import ScriptError, parse_script, render_script
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +24,15 @@ SYSTEM_PROMPT = f"""你是台股技術面選股條件生成器。使用者會用
 然後從下方「可用指標目錄」中挑選指標，動態組合成可執行的篩選條件公式。
 只輸出 JSON，不要輸出其他文字。
 
-## 可用指標目錄（所有指標皆為「最新一根日K」的數值）
+## 可用指標目錄（未指定 tf 時指標皆為「最新一根日K」的數值）
 {CATALOG_TEXT}
 
 ## 條件語法
 每個條件是一個物件：
 {{"metric": "指標名稱", "op": "運算子", "value": "數值或另一指標", "note": "給使用者看的繁中說明"}}
+
+可選欄位 "tf" 指定時間框架：省略＝日K（預設），"w"＝週K，"15m"＝15分K。
+只有使用者明確要求週K/15分K等多時間框架條件時才輸出 "tf"，否則一律省略；同一條件的指標比較只會在同時間框架內進行。
 
 運算子（op）：
 - ">", ">=", "<", "<=", "=="：數值比較。value 可以是數字，也可以是另一指標名稱（例如 ma8 > ma21）
@@ -53,6 +58,13 @@ class AiScreenRequest(BaseModel):
     scope: str = Field(default="all", description="掃描範圍: all / watchlist / sector:<industry>")
     llm: dict = Field(description="LLM 連線設定（base_url/model/api_key/temperature/max_tokens/fallback）")
     conditions: list[dict] | None = Field(default=None, description="已生成的條件公式；提供時跳過 LLM 直接掃描（兩階段確認流程第二階段用）")
+
+
+class ScreenPostRequest(BaseModel):
+    preset_id: str | None = Field(default=None, description="預設策略 id（與 conditions 二選一）")
+    conditions: list[dict] | None = Field(default=None, description="自訂條件公式；提供時直接驗證掃描")
+    limit: int = Field(default=50, ge=1, le=5000)
+    scope: str = Field(default="all", description="掃描範圍: all / watchlist / sector:<industry>")
 
 
 class IndicatorSearchRequest(BaseModel):
@@ -113,6 +125,30 @@ class AiSuggestRequest(BaseModel):
     description: str = Field(min_length=2, max_length=500, description="自然語言股票描述")
     universe: list[dict] = Field(description="候選股票清單（stock_id/name/tags/market）")
     llm: dict = Field(description="LLM 連線設定（base_url/model/api_key/temperature/max_tokens/fallback）")
+
+
+PRESET_STRATEGIES = [
+    {
+        "id": "multi_tf_6g",
+        "name": "多時框 6 組條件（13 條）",
+        "description": "週K 均線多頭 + 日K 趨勢突破 + 15分K 短線動能，13 條全通過才列出",
+        "conditions": [
+            {"metric": "ma8", "op": ">", "value": "ma21", "tf": "w", "note": "週K MA8>MA21"},
+            {"metric": "ma21", "op": ">", "value": "ma55", "tf": "w", "note": "週K MA21>MA55"},
+            {"metric": "slope55", "op": ">", "value": 0, "note": "日K MA55斜率>0"},
+            {"metric": "price", "op": ">", "value": "ma55", "note": "收盤>MA55"},
+            {"metric": "ma8", "op": ">", "value": "ma21", "tf": "15m", "note": "15分 MA8>MA21"},
+            {"metric": "ma21", "op": ">", "value": "ma55", "tf": "15m", "note": "15分 MA21>MA55"},
+            {"metric": "slope8", "op": ">", "value": 0, "tf": "15m", "note": "15分 MA8斜率>0"},
+            {"metric": "slope21", "op": ">", "value": 0, "tf": "15m", "note": "15分 MA21斜率>0"},
+            {"metric": "slope55", "op": ">", "value": 0, "tf": "15m", "note": "15分 MA55斜率>0"},
+            {"metric": "price", "op": ">=", "value": "max_high_2d", "note": "收盤≥2日最高"},
+            {"metric": "slope5", "op": ">", "value": 0, "note": "5日線斜率>0"},
+            {"metric": "price", "op": ">=", "value": "ma8", "note": "收盤≥MA8"},
+            {"metric": "slope8", "op": ">", "value": 0, "note": "8日線斜率>0"},
+        ],
+    },
+]
 
 
 def _validate_conditions(conditions: list[dict]) -> list[dict]:
@@ -195,6 +231,20 @@ def _resolve_scope(db: StandardDatabase, scope: str) -> dict[str, str]:
     return {str(row["stock_id"]): row.get("name") for row in cursor}
 
 
+def _market_label(stock_id: str) -> str:
+    """Map a stock_id to its 市場別 label (上市 / 上櫃 / 上市ETF / 上市TDR ...)."""
+    info = twstock.codes.get(stock_id)
+    if info is None:
+        return ""
+    if info.type == "ETF":
+        return f"{info.market}ETF"
+    if info.type == "股票":
+        return info.market
+    if "TDR" in info.type:
+        return "上市TDR"
+    return info.market
+
+
 def _scan(
     conditions: list[dict],
     limit: int,
@@ -220,6 +270,7 @@ def _scan(
         except Exception:
             continue  # missing data / fetch error — skip
         if r and r["passed"]:
+            r["market"] = _market_label(sid)
             results.append(r)
 
     results.sort(key=lambda x: x["score"], reverse=True)
@@ -239,6 +290,7 @@ def _manual_conditions(
     above_offset: bool,
     vol_expand: bool,
     vol_ratio: float,
+    inst_active: bool,
 ) -> list[dict]:
     """Map the manual 7-boolean strategy switches onto the condition DSL so the
     manual screen shares the same evaluation engine (and shows actual values)."""
@@ -259,7 +311,39 @@ def _manual_conditions(
         conditions.append({"metric": "price", "op": ">", "value": "close_offset", "note": "收盤>扣抵值"})
     if vol_expand:
         conditions.append({"metric": "vol_ratio", "op": ">", "value": vol_ratio, "note": f"量比>{vol_ratio:.1f}"})
+    if inst_active:
+        conditions.append({"metric": "inst_active", "op": "is_true", "value": None, "note": "近15日三大法人有交易"})
     return conditions
+
+
+@router.get("/presets")
+def list_presets() -> dict:
+    """Return the built-in preset strategies (id / name / description / conditions)."""
+    return {"presets": PRESET_STRATEGIES}
+
+
+@router.post("/screen")
+def screen_post(req: ScreenPostRequest) -> dict:
+    """Run a preset strategy (preset_id) or custom conditions against the universe."""
+    if req.preset_id:
+        preset = next((p for p in PRESET_STRATEGIES if p["id"] == req.preset_id), None)
+        if preset is None:
+            raise HTTPException(status_code=404, detail=f"未知策略 id: {req.preset_id}")
+        conditions = _validate_conditions(preset["conditions"])
+    elif req.conditions:
+        conditions = _validate_conditions(req.conditions)
+    else:
+        raise HTTPException(status_code=422, detail="請提供 preset_id 或 conditions")
+    if not conditions:
+        raise HTTPException(status_code=422, detail="無有效條件")
+    results, scanned = _scan(conditions, req.limit, _resolve_scope(get_db(), req.scope))
+    return {
+        "total": len(results),
+        "scanned": scanned,
+        "results": results,
+        "conditions": conditions,
+        "scope": req.scope,
+    }
 
 
 @router.get("/screen")
@@ -276,7 +360,8 @@ def screen(
     above_offset: bool = Query(default=False, description="收盤 > 扣抵值"),
     vol_expand: bool = Query(default=False, description="近5日均量 > 近20日 x 倍"),
     vol_ratio: float = Query(default=1.2, ge=1.0, le=5.0),
-    limit: int = Query(default=50, ge=1, le=200, description="回傳最多幾檔"),
+    inst_active: bool = Query(default=False, description="近15交易日三大法人有交易"),
+    limit: int = Query(default=50, ge=1, le=5000, description="回傳最多幾檔（上限 5000）"),
     scope: str = Query(default="all", description="掃描範圍: all / watchlist / sector:<industry>"),
 ) -> dict:
     """Manual common-strategy screening. The 7 boolean switches are mapped onto
@@ -284,6 +369,7 @@ def screen(
     conditions = _manual_conditions(
         ma_bull, ma_slope, slope_min, kdj_golden, kdj_max,
         rsi_mid, rsi_min, rsi_max, macd_pos, above_offset, vol_expand, vol_ratio,
+        inst_active,
     )
     results, scanned = _scan(conditions, limit, _resolve_scope(get_db(), scope))
     return {
@@ -486,3 +572,179 @@ def ai_screen(req: AiScreenRequest) -> dict:
         "used_fallback": used.get("fallback", False),
         "fallback_model": used.get("model") if used.get("fallback") else None,
     }
+
+
+class ScriptParseRequest(BaseModel):
+    script: str = Field(min_length=1, max_length=4000, description="受限語言策略腳本")
+
+
+class ScriptRunRequest(BaseModel):
+    script: str = Field(min_length=1, max_length=4000, description="受限語言策略腳本")
+    limit: int = Field(default=50, ge=1, le=5000)
+    scope: str = Field(default="all", description="掃描範圍: all / watchlist / sector:<industry>")
+
+
+def _script_to_conditions(script: str) -> list[dict]:
+    try:
+        raw = parse_script(script)
+    except ScriptError as exc:
+        raise HTTPException(status_code=422, detail=f"腳本解析失敗：{exc}") from exc
+    conditions = _validate_conditions(raw)
+    if not conditions:
+        raise HTTPException(status_code=422, detail="腳本沒有有效條件（請確認指標都在目錄內）")
+    return conditions
+
+
+@router.post("/parse-script")
+def parse_script_endpoint(req: ScriptParseRequest) -> dict:
+    conditions = _script_to_conditions(req.script)
+    return {"conditions": conditions, "script": render_script(conditions)}
+
+
+@router.post("/run-script")
+def run_script(req: ScriptRunRequest) -> dict:
+    conditions = _script_to_conditions(req.script)
+    matched, scanned = _scan(conditions, 5000, _resolve_scope(get_db(), req.scope))
+    return {
+        "total": len(matched),
+        "scanned": scanned,
+        "results": matched[: req.limit],
+        "conditions": conditions,
+        "scope": req.scope,
+    }
+
+
+SCRIPT_SYSTEM_PROMPT = f"""你是台股選股策略腳本生成器。使用者會用自然語言描述想找的股票，
+請轉成一段「策略腳本」。只輸出 JSON，不要輸出其他文字。
+
+## 可用指標目錄（未指定 tf 時為日K）
+{CATALOG_TEXT}
+
+## 腳本語法（受限語言）
+- 每行一個敘述；`名稱 = 運算式` 指派布林群組；最後以 `buy = 運算式` 作為訊號。
+- 運算元：目錄內的指標名稱、或數字。
+- 比較運算子：> >= < <= ==。數值指標必須搭配運算子（如 rsi > 60）；布林指標單獨使用（如 inst_active）。
+- 邏輯連接：只用 `and`（或 `&`）。**不支援 or / not**（掃描引擎為 AND）。
+- 時間框架：預設日K；`weekly(比較)`＝週K、`m15(比較)`＝15分K。
+- 可加 `#` 註解。
+
+## 範例
+trend = (ma8 > ma21) and (ma21 > ma55)
+momentum = rsi > 60
+chips = inst_active
+buy = trend and momentum and chips
+
+## 輸出格式
+{{"script": "腳本文字", "explanation": "一句繁中說明你如何理解需求"}}
+
+## 原則
+1. 只用目錄內指標；條件 1~5 個；描述模糊時選 2~3 個合理技術條件。
+2. 不要使用 or / not。"""
+
+
+class GenerateScriptRequest(BaseModel):
+    description: str = Field(min_length=2, max_length=500)
+    llm: dict = Field(description="LLM 連線設定")
+
+
+@router.post("/generate-script")
+def generate_script(req: GenerateScriptRequest) -> dict:
+    if not req.description.strip():
+        raise HTTPException(status_code=422, detail="請輸入策略描述")
+    llm = req.llm or {}
+    try:
+        reply, used = chat_completion_with_fallback(
+            llm=llm,
+            system_prompt=SCRIPT_SYSTEM_PROMPT,
+            user_prompt=f"選股描述：{req.description}",
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    try:
+        parsed = extract_json_object(reply)
+    except ValueError as exc:
+        logger.error("generate-script reply not parseable: %s", reply[:500])
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    explanation = str(parsed.get("explanation", ""))
+    conditions: list[dict] = []
+    script_text = str(parsed.get("script", "")).strip()
+    if script_text:
+        try:
+            conditions = _validate_conditions(parse_script(script_text))
+        except ScriptError:
+            conditions = []
+
+    if not conditions:
+        try:
+            reply2, _ = chat_completion_with_fallback(
+                llm=llm,
+                system_prompt=build_system_prompt(None),
+                user_prompt=f"選股描述：{req.description}\n回傳筆數上限：50",
+            )
+            parsed2 = extract_json_object(reply2)
+            conditions = _validate_conditions(parsed2.get("conditions", []))
+            if not explanation:
+                explanation = str(parsed2.get("explanation", ""))
+        except (ValueError, RuntimeError):
+            conditions = []
+
+    if not conditions:
+        raise HTTPException(status_code=502, detail="AI 未生成有效策略，請換句話描述")
+
+    return {
+        "description": req.description,
+        "script": render_script(conditions),
+        "conditions": conditions,
+        "explanation": explanation,
+        "used_fallback": used.get("fallback", False),
+        "fallback_model": used.get("model") if used.get("fallback") else None,
+    }
+
+
+@router.get("/indicators")
+def list_indicators() -> dict:
+    return {"ops": list(ALLOWED_OPS), "indicators": INDICATOR_CATALOG}
+
+
+EXPLAIN_SYSTEM_PROMPT = """你是台股量化策略解說員。使用者提供一組「選股條件」與其原始描述，
+請產出精簡的繁體中文 Markdown 說明，只輸出 Markdown，不要有其他文字。內容包含：
+1. **策略意涵**：這些條件合起來在找什麼樣的股票（1~2 句）。
+2. **功能 → 條件對照**：逐條說明每個條件代表什麼。
+3. 一張 **Mermaid 決策流程圖**：用 ```mermaid 區塊、`flowchart TD`，把各條件匯流到 `buy` 訊號。
+範例：
+```mermaid
+flowchart TD
+  A[趨勢: MA8>MA21] --> D((buy))
+  B[動能: RSI>60] --> D
+  C[籌碼: 法人買超] --> D
+```"""
+
+
+class ExplainRequest(BaseModel):
+    description: str = Field(default="", max_length=500)
+    conditions: list[dict] = Field(default_factory=list)
+    llm: dict = Field(description="LLM 連線設定")
+
+
+@router.post("/explain")
+def explain_strategy(req: ExplainRequest) -> dict:
+    if not req.conditions:
+        raise HTTPException(status_code=422, detail="沒有條件可解釋")
+    llm = req.llm or {}
+    cond_lines = "\n".join(
+        f"- {c.get('note') or c.get('metric')}（metric={c.get('metric')}, "
+        f"op={c.get('op')}, value={c.get('value')}"
+        + (f", tf={c.get('tf')}" if c.get("tf") else "")
+        + "）"
+        for c in req.conditions
+    )
+    user_prompt = f"使用者描述：{req.description or '（無）'}\n\n選股條件：\n{cond_lines}"
+    try:
+        reply, used = chat_completion_with_fallback(
+            llm=llm, system_prompt=EXPLAIN_SYSTEM_PROMPT, user_prompt=user_prompt
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"markdown": reply, "used_fallback": used.get("fallback", False)}
