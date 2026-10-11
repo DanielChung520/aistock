@@ -43,6 +43,11 @@ frontend/public/iframe
 .cache/
 .sisyphus/
 
+# Raw data files (large CSVs, model artifacts)
+data/
+*.csv
+!frontend/**/*.csv
+
 # Tauri generated icons (sub-folders)
 frontend/src-tauri/icons/android/
 frontend/src-tauri/icons/ios/
@@ -64,3 +69,13 @@ aiStock_*.exe
 # AI tool runtime state
 .omo/
 .placeholder/
+backend/models/
+backend/tx_rl_models/
+frontend/qa-shots/
+.playwright-mcp/
+step1-selected.yml
+step5-snap.yml
+step6-save-model-page.yml
+job-reloaded.yml
+full-snapshot.md
+ai-training-list.yml
