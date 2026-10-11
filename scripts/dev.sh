@@ -15,6 +15,17 @@ echo "[Backend] PID: $BACKEND_PID"
 
 sleep 2
 
+# ── Celery worker (task queue for scheduled jobs) ──
+# setsid: detach from this script's process group so a Ctrl-C / timeout that
+# kills the group cannot take the worker down; nohup: survive terminal close.
+# Log goes to /tmp/celery-worker.log for inspection.
+echo "[Celery] Starting worker..."
+cd "$ROOT/backend"
+setsid nohup .venv/bin/celery -A src.celery_app worker --loglevel=info \
+  > /tmp/celery-worker.log 2>&1 < /dev/null &
+CELERY_PID=$!
+echo "[Celery] PID: $CELERY_PID (log: /tmp/celery-worker.log)"
+
 # ── Frontend (Next.js dev) ──
 echo "[Frontend] Starting Next.js dev server on port 33300..."
 cd "$ROOT/frontend"
@@ -23,3 +34,4 @@ npx next dev --webpack --port 33300
 # ── Cleanup on exit ──
 echo "Shutting down..."
 kill $BACKEND_PID 2>/dev/null || true
+kill $CELERY_PID 2>/dev/null || true

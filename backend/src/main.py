@@ -17,6 +17,8 @@ from src.routers.market import router as market_router
 from src.routers.schedule import router as schedule_router
 from src.routers.stocks import router as stocks_router
 from src.routers.strategy import router as strategy_router
+from src.routers.strategies import router as strategies_router
+from src.routers.strategy_runs import router as strategy_runs_router
 from src.routers.strategy_hits import router as strategy_hits_router
 from src.routers.watchlist import router as watchlist_router
 from src.routers.news import router as news_router
@@ -24,6 +26,7 @@ from src.routers.patterns import router as patterns_router
 from src.routers.features import router as features_router
 from src.routers.ai_training import router as ai_training_router
 from src.routers.tx_rl import router as tx_rl_router
+from src.routers.tx_data import router as tx_data_router
 
 logger = logging.getLogger(__name__)
 
@@ -126,8 +129,11 @@ app.include_router(basics_router, prefix="/api")
 app.include_router(auction_router, prefix="/api")
 app.include_router(backtest_router, prefix="/api")
 app.include_router(strategy_router, prefix="/api")
+app.include_router(strategies_router, prefix="/api")
+app.include_router(strategy_runs_router, prefix="/api")
 app.include_router(strategy_hits_router, prefix="/api")
 app.include_router(patterns_router, prefix="/api")
 app.include_router(features_router, prefix="/api")
 app.include_router(ai_training_router, prefix="/api")
 app.include_router(tx_rl_router, prefix="/api")
+app.include_router(tx_data_router, prefix="/api")

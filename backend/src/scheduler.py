@@ -98,6 +98,20 @@ PREDEFINED_JOBS = {
         "default_cron": "45 15 * * 1-5",
         "default_params": {},
     },
+    "institutional_daily": {
+        "name": "三大法人-每日增量",
+        "type": "institutional_daily",
+        "description": "全市場三大法人買賣超每日增量（TWSE T86 + TPEx，永久保存）",
+        "default_cron": "30 16 * * 1-5",
+        "default_params": {},
+    },
+    "tx_data_daily": {
+        "name": "TX 期貨-每日增量",
+        "type": "tx_data_daily",
+        "description": "每日盤後增量下載 TX 期貨 1 分 K → 聚合成 15 分 K（需 Shioaji 認證）",
+        "default_cron": "30 14 * * 1-5",
+        "default_params": {"lookback_days": 7, "contracts": ["TXFR1", "TXFR2"], "bar_minutes": [1, 15]},
+    },
 }
 
 _scheduler: BackgroundScheduler | None = None
@@ -166,6 +180,16 @@ def execute_job(job: dict) -> int | None:
             "market_index_daily": market_index_daily,
         }
         task_map[job_type].delay()
+        return None
+
+    if job_type == "tx_data_daily":
+        from src.tasks.tx_data_daily import tx_data_daily_task
+        tx_data_daily_task.delay(params or {})
+        return None
+
+    if job_type == "institutional_daily":
+        from src.tasks.institutional_daily import institutional_daily
+        institutional_daily.delay()
         return None
 
     if job_type == "tech_indicators":

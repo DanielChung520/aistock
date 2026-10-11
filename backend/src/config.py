@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     SEAWEEDFS_SECRET_KEY: str = "admin123"
     SEAWEEDFS_BUCKET: str = "aistock-market-data"
     FINMIND_TOKEN: str = ""
+    # Trained-model blob directory (spec §十). Empty → backend/models.
+    MODELS_DIR: str = ""
 
 
 @lru_cache(maxsize=1)

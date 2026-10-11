@@ -12,7 +12,8 @@ def get_client() -> ArangoClient:
     global _client
     if _client is None:
         settings = get_settings()
-        _client = ArangoClient(hosts=settings.ARANGO_URL)
+        # request_timeout=300: 大查詢（如敏感度分析載入全特徵）可能超過預設 60s
+        _client = ArangoClient(hosts=settings.ARANGO_URL, request_timeout=300)
     return _client
 
 
