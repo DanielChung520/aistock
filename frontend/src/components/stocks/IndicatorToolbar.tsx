@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import type { IndicatorSettings } from '@/types/stock'
+import type { IndicatorSettings, MaAccuracy } from '@/types/stock'
 import { Button } from '@/components/ui/button'
 import { IndicatorSettingsPopup } from './IndicatorSettingsPopup'
 
@@ -12,12 +12,14 @@ interface IndicatorToolbarProps {
     values: Partial<IndicatorSettings[K]>
   ) => void
   onResetSetting: (indicator: keyof Omit<IndicatorSettings, 'version'>) => void
+  accuracy?: MaAccuracy
 }
 
 const INDICATORS = [
-  { key: 'ma', label: 'MA均線', hasSettings: true },
+  { key: 'ma', label: 'Daniel MA', hasSettings: true },
   { key: 'bollinger', label: '布林通道', hasSettings: true },
   { key: 'volume', label: '成交量', hasSettings: false },
+  { key: 'volume_ma', label: '量 MA', hasSettings: false },
   { key: 'kdj', label: 'KDJ', hasSettings: true },
   { key: 'macd', label: 'MACD', hasSettings: true },
   { key: 'rsi', label: 'RSI', hasSettings: true },
@@ -27,6 +29,7 @@ export function IndicatorToolbar({
   settings,
   onUpdateSetting,
   onResetSetting,
+  accuracy,
 }: IndicatorToolbarProps) {
   const [mounted, setMounted] = React.useState(false)
   React.useEffect(() => { setMounted(true) }, [])
@@ -62,6 +65,14 @@ export function IndicatorToolbar({
           </div>
         )
       })}
+      {accuracy && (
+        <span className="ml-auto text-[11px] text-muted-foreground whitespace-nowrap">
+          買準確率 <span className="text-red-500">{accuracy.buy_accuracy != null ? accuracy.buy_accuracy + '%' : '—'}</span>
+          {' / '}
+          賣準確率 <span className="text-green-500">{accuracy.sell_accuracy != null ? accuracy.sell_accuracy + '%' : '—'}</span>
+          <span className="text-muted-foreground/70"> ({accuracy.horizon}根)</span>
+        </span>
+      )}
     </div>
   )
 }

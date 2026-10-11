@@ -26,7 +26,7 @@ interface IndicatorSettingsPopupProps {
 }
 
 const INDICATOR_TITLES: Record<string, string> = {
-  ma: 'MA均線',
+  ma: 'Daniel MA',
   bollinger: '布林通道',
   kdj: 'KDJ',
   macd: 'MACD',
@@ -88,19 +88,66 @@ export function IndicatorSettingsPopup({
         />
       </div>
       <div className="space-y-2">
-        <Label className="text-xs">類型</Label>
-        <Select
-          value={settings.ma.type}
-          onValueChange={(val: 'sma' | 'ema') => onUpdate('ma', { type: val })}
-        >
-          <SelectTrigger className="h-8 text-xs">
-            <SelectValue placeholder="選擇類型" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="sma" className="text-xs">SMA (簡單移動平均)</SelectItem>
-            <SelectItem value="ema" className="text-xs">EMA (指數移動平均)</SelectItem>
-          </SelectContent>
-        </Select>
+        <Label className="text-xs">扣抵數 (Lookback)</Label>
+        <Input
+          type="number"
+          min={1}
+          max={250}
+          value={settings.ma.lookback || ''}
+          onChange={(e: ChangeEvent<HTMLInputElement>) =>
+            handleNumberChange('lookback', e.target.value, 1, 250, (val) =>
+              onUpdate('ma', { lookback: val })
+            )
+          }
+          className="h-8"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label className="text-xs">訊號冷卻 (Cooldown 根)</Label>
+        <Input
+          type="number"
+          min={0}
+          max={50}
+          value={settings.ma.cooldown}
+          onChange={(e: ChangeEvent<HTMLInputElement>) =>
+            handleNumberChange('cooldown', e.target.value, 0, 50, (val) =>
+              onUpdate('ma', { cooldown: val })
+            )
+          }
+          className="h-8"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label className="text-xs">買進斜率下限 (%)</Label>
+        <Input
+          type="number"
+          min={0}
+          max={10}
+          step={0.01}
+          value={settings.ma.buySlopeMin}
+          onChange={(e: ChangeEvent<HTMLInputElement>) =>
+            handleNumberChange('buySlopeMin', e.target.value, 0, 10, (val) =>
+              onUpdate('ma', { buySlopeMin: val })
+            )
+          }
+          className="h-8"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label className="text-xs">賣出斜率上限 (%)</Label>
+        <Input
+          type="number"
+          min={0}
+          max={10}
+          step={0.01}
+          value={settings.ma.sellSlopeMax}
+          onChange={(e: ChangeEvent<HTMLInputElement>) =>
+            handleNumberChange('sellSlopeMax', e.target.value, 0, 10, (val) =>
+              onUpdate('ma', { sellSlopeMax: val })
+            )
+          }
+          className="h-8"
+        />
       </div>
     </>
   )
