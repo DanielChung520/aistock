@@ -31,7 +31,9 @@ for _p in _COLLECT_PKGS:
         print(f"WARNING: collect_submodules({_p}) 失敗，已跳過: {exc}")
 
 datas = []
-for _p in ("sklearn", "xgboost", "lightgbm", "celery", "yfinance"):
+# twstock 執行時會讀 package 內 CSV（codes/twse_equities.csv 等），
+# 必須以資料檔形式放到 _internal/twstock/codes/，否則 FileNotFoundError。
+for _p in ("sklearn", "xgboost", "lightgbm", "celery", "yfinance", "twstock"):
     datas += collect_data_files(_p)
 
 a = Analysis(
