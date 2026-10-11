@@ -9,8 +9,6 @@ from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 _COLLECT_PKGS = [
     "celery",
     "duckdb",
-    "xgboost",
-    "lightgbm",
     "sklearn",
     "yfinance",
     "twstock",
@@ -22,11 +20,15 @@ _COLLECT_PKGS = [
     "gymnasium",
 ]
 
-hiddenimports = []
+# xgboost/lightgbm 的 testing 子模組在 import 時會丟 pytest.Skipped（BaseException，
+# 非 Exception），collect_submodules 的 on_error="warn" 接不住 → 不放進 collect；
+# 其原生 lib 由 PyInstaller 官方 hook 處理，把套件根加進 hiddenimports 即可。
+hiddenimports = ["xgboost", "lightgbm"]
 for _p in _COLLECT_PKGS:
-    # on_error="warn": 選用子模組（如 celery.security 需 cryptography）缺依賴時
-    # 跳過而非中止整個打包
-    hiddenimports += collect_submodules(_p, on_error="warn")
+    try:
+        hiddenimports += collect_submodules(_p, on_error="warn")
+    except BaseException as exc:  # noqa: BLE001 — 子模組可能丟 pytest.Skipped 等 BaseException
+        print(f"WARNING: collect_submodules({_p}) 失敗，已跳過: {exc}")
 
 datas = []
 for _p in ("sklearn", "xgboost", "lightgbm", "celery", "yfinance"):
