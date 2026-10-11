@@ -29,7 +29,7 @@ const TARGET_TYPE_LABELS = {
 
 export function HippocampusTimeline({ events }: HippocampusTimelineProps) {
   const sortedEvents = [...events].sort(
-    (a, b) => new Date(b.created_at * 1000).getTime() - new Date(a.created_at * 1000).getTime(),
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   )
 
   return (
@@ -107,7 +107,7 @@ export function HippocampusTimeline({ events }: HippocampusTimelineProps) {
                       <span className="font-mono">{event.created_by}</span>
                       <span>·</span>
                       <span>
-                        {new Date(event.created_at * 1000).toLocaleString('zh-TW', {
+                        {new Date(event.created_at).toLocaleString('zh-TW', {
                           month: '2-digit',
                           day: '2-digit',
                           hour: '2-digit',

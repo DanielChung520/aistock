@@ -1,0 +1,142 @@
+{
+  "name": "stock-investment-tw-v0.1",
+  "description": "台股投資本體 v0.1（最小可用版本）：涵蓋個股辨識、所屬產業、即時新聞、財務數字 4 個 entity，足以回答「這家公司最近怎麼樣？」「它在哪個產業？」「EPS 多少？」等散戶基本查詢。其他 entity（Person、Policy、AnalystRecommendation、FinancialConcept 等）留待 v0.2+ 依實際使用觸發。",
+  "inherits_from": null,
+  "version": "0.1",
+  "status": "draft",
+  "tags": ["tw-stock", "retail", "minimal-viable"],
+  "use_cases": [
+    "個股辨識：'台積電是 2330 對嗎？'",
+    "產業歸屬：'台積電屬於哪個產業？同產業還有哪些公司？'",
+    "新聞追蹤：'聯發科最近有什麼重要消息？'",
+    "財務查詢：'台積電 2026 Q2 EPS 多少？'",
+    "跨 entity 查詢：'台積電 Q2 法說會提到哪些重點？'"
+  ],
+  "payload": {
+    "entity_classes": [
+      {
+        "name": "Company",
+        "description": "在台灣證券交易所 (TWSE) 或證券櫃買中心 (TPEx) 掛牌的公司，含上市、上櫃",
+        "examples": [
+          "台積電",
+          "TSMC",
+          "2330",
+          "TWSE:2330",
+          "聯發科",
+          "2454",
+          "鴻海",
+          "2317"
+        ],
+        "properties": [
+          { "name": "stock_code",   "type": "string", "description": "台股代碼，純數字字串，如 '2330'" },
+          { "name": "name_zh",       "type": "string", "description": "中文公司簡稱" },
+          { "name": "name_en",       "type": "string", "description": "英文公司簡稱（可選）" },
+          { "name": "market",        "type": "enum",   "values": ["TWSE", "TPEx"], "description": "掛牌市場" }
+        ]
+      },
+      {
+        "name": "Industry",
+        "description": "TWSE/TPEx 行業分類（依上市櫃公司產業類別劃分）",
+        "examples": [
+          "半導體業",
+          "金融保險",
+          "電機機械",
+          "塑膠工業",
+          "23",
+          "M2320"
+        ],
+        "properties": [
+          { "name": "code", "type": "string", "description": "TWSE/TPEx 行業代碼" },
+          { "name": "name", "type": "string", "description": "行業中文名稱" }
+        ]
+      },
+      {
+        "name": "NewsEvent",
+        "description": "與公司、產業或市場相關的時效性事件，含重大訊息、媒體報導、法說會",
+        "examples": [
+          "台積電 7 月法說會聚焦 3 奈米",
+          "聯發科宣布併購 Intel 旗下部門",
+          "央行升息半碼",
+          "0056 配息 0.7 元公告"
+        ],
+        "properties": [
+          { "name": "date",     "type": "date",   "description": "事件日期" },
+          { "name": "title",    "type": "string", "description": "事件標題" },
+          { "name": "category", "type": "enum",   "values": ["earnings", "merger", "regulatory", "product", "executive", "market"], "description": "事件類別" },
+          { "name": "source",   "type": "string", "description": "消息來源（如：工商時報、公司重訊）" }
+        ]
+      },
+      {
+        "name": "FinancialItem",
+        "description": "公司財務報表項目（合併 / 個體、月 / 季 / 年），含資產負債表、損益表、現金流量表",
+        "examples": [
+          "2025 Q3 EPS 7.8 元",
+          "聯發科 2024 全年合併營收 4,500 億元",
+          "台積電 2025 Q3 毛利率 53%"
+        ],
+        "properties": [
+          { "name": "metric",      "type": "string", "description": "財務指標名稱（如：營收、EPS、毛利率、淨利）" },
+          { "name": "value",       "type": "number", "description": "數值" },
+          { "name": "unit",        "type": "string", "description": "單位（元 / 億元 / % / 元/股）" },
+          { "name": "period",      "type": "string", "description": "報告期（如：2025Q3、2024Y）" },
+          { "name": "period_type", "type": "enum",   "values": ["monthly", "quarterly", "yearly"], "description": "週期類型" }
+        ]
+      }
+    ],
+    "object_properties": [
+      {
+        "name": "operates_in",
+        "description": "公司所屬產業",
+        "domain": "Company",
+        "range": "Industry",
+        "examples": [
+          "台積電屬於半導體業",
+          "聯發科 2454 為 IC 設計業",
+          "玉山金 2884 屬於金融保險"
+        ]
+      },
+      {
+        "name": "mentions",
+        "description": "新聞 / 重大訊息 / 法說會提到某公司",
+        "domain": "NewsEvent",
+        "range": "Company",
+        "examples": [
+          "台積電 7 月法說會聚焦 3 奈米",
+          "聯發科宣布併購 Intel 旗下部門",
+          "0056 配息公告"
+        ]
+      },
+      {
+        "name": "reported_in",
+        "description": "財務數據所屬公司",
+        "domain": "FinancialItem",
+        "range": "Company",
+        "examples": [
+          "台積電 Q3 EPS 7.8 元",
+          "聯發科 2024 全年營收 4,500 億",
+          "台積電 2025 Q3 毛利率 53%"
+        ]
+      }
+    ]
+  },
+  "evolution": {
+    "v0.1_trigger": [
+      "PM 提問 '台股散戶最常問的問題是什麼？' → 聚焦個股辨識 / 產業歸屬 / 新聞追蹤 / 財務查詢 4 大類",
+      "選擇最小可上線版本 (4 entity + 3 property)，其他 entity 待 v0.2+ 依實際使用觸發"
+    ],
+    "intentionally_excluded_in_v0.1": [
+      "Person (董事長、大股東、基金經理) — 散戶問的頻率較低",
+      "Policy (法規影響) — 預期影響頻率低",
+      "AnalystRecommendation (分析師評等 / 目標價) — 屬 Layer 3 決策軸，v0.5+ 視需要加入",
+      "ReturnMetric (報酬指標) — 屬 Layer 3 結果軸，v0.5+ 視需要加入",
+      "FinancialConcept (本益比 / ROE 等詞彙) — 屬 Layer 4 概念軸，等真的有問到再加",
+      "TechnicalSignal (技術指標) — 給散戶看的進入門檻高"
+    ],
+    "next_trigger_examples": [
+      "PM 問 '台積電董事長是誰？' → 加入 Person",
+      "PM 問 '本益比多少？' → 加入 FinancialConcept (含本益比定義)",
+      "PM 問 '分析師怎麼看？' → 加入 AnalystRecommendation",
+      "PM 問 '0050 跟台積電的相關性？' → 加入 FundOrETF entity + correlation property"
+    ]
+  }
+}

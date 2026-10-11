@@ -134,7 +134,7 @@ export default function OntologyListPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {new Date(ont.updated_at * 1000).toLocaleString('zh-TW', {
+                        {new Date(ont.updated_at).toLocaleString('zh-TW', {
                           month: '2-digit',
                           day: '2-digit',
                           hour: '2-digit',
