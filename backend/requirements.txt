@@ -18,8 +18,10 @@ scikit-learn>=1.3
 xgboost>=2.0
 lightgbm>=4.1
 joblib>=1.3
-# torch: PyPI aarch64 wheels are CPU-only. DGX Spark (GB10, CUDA 13) must install:
-#   pip install torch==2.13.0+cu130 --index-url https://download.pytorch.org/whl/cu130
+# torch: PyPI aarch64 wheels are CPU-only. DGX Spark (GB10, CUDA 13) needs the
+# cu130 index; declared below so `pip install -r requirements.txt` works
+# everywhere (CI 亦同), not just with the manual --index-url command.
+--extra-index-url https://download.pytorch.org/whl/cu130
 torch==2.13.0+cu130
 # TX-RL 強化學習依賴（TX-0010-rl-trading-spec §3.1）
 gymnasium>=0.29
