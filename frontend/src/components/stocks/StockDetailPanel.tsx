@@ -280,10 +280,16 @@ export function StockDetailPanel({
   const settingsRef = useRef(settings)
   settingsRef.current = settings
   const prevSettingsRef = useRef(settings)
+  const prevSettingsRefMinute = useRef(settings)
+  const minuteDataRef = useRef(minuteData)
+  minuteDataRef.current = minuteData
 
   useEffect(() => {
-    const fetchDailyData = () => {
-      setLoading(true)
+    const settingsChanged = prevSettingsRef.current !== settings
+    prevSettingsRef.current = settings
+
+    const fetchDailyData = (showLoading: boolean) => {
+      if (showLoading) setLoading(true)
       setError(null)
       const indicatorParams = buildIndicatorParams(settingsRef.current)
 
@@ -329,15 +335,12 @@ export function StockDetailPanel({
         })
     }
 
-    const settingsChanged = prevSettingsRef.current !== settings
-    prevSettingsRef.current = settings
-
     if (settingsChanged) {
       if (debounceTimerDaily.current) clearTimeout(debounceTimerDaily.current)
-      debounceTimerDaily.current = setTimeout(fetchDailyData, 500)
+      debounceTimerDaily.current = setTimeout(() => fetchDailyData(false), 500)
     } else {
       if (debounceTimerDaily.current) clearTimeout(debounceTimerDaily.current)
-      fetchDailyData()
+      fetchDailyData(true)
     }
 
     return () => {
@@ -407,8 +410,13 @@ export function StockDetailPanel({
 
   useEffect(() => {
     if (timeframe === 'minute') {
-      const fetchMinuteData = () => {
-        setMinuteLoading(true)
+      const settingsChanged = prevSettingsRefMinute.current !== settings
+      prevSettingsRefMinute.current = settings
+      const hasMinuteData = Array.isArray(minuteDataRef.current) && minuteDataRef.current.length > 0
+      const initialShowLoading = !settingsChanged || !hasMinuteData
+
+      const fetchMinuteData = (showLoading: boolean) => {
+        if (showLoading) setMinuteLoading(true)
         const days = minuteInterval === '1m' ? 7 : 30
         const indicatorParams = buildIndicatorParams(settingsRef.current)
 
@@ -465,13 +473,11 @@ export function StockDetailPanel({
           })
       }
 
-      const settingsChanged = prevSettingsRef.current !== settings
+      if (debounceTimerMinute.current) clearTimeout(debounceTimerMinute.current)
       if (settingsChanged) {
-        if (debounceTimerMinute.current) clearTimeout(debounceTimerMinute.current)
-        debounceTimerMinute.current = setTimeout(fetchMinuteData, 500)
+        debounceTimerMinute.current = setTimeout(() => fetchMinuteData(initialShowLoading), 500)
       } else {
-        if (debounceTimerMinute.current) clearTimeout(debounceTimerMinute.current)
-        fetchMinuteData()
+        fetchMinuteData(initialShowLoading)
       }
     }
 
