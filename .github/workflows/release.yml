@@ -38,9 +38,6 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
-      - name: Pre-flight config validation
-        working-directory: ${{ github.workspace }}
-        run: bash scripts/validate-tauri-config.sh
       - uses: pnpm/action-setup@v4
         with:
           version: 9
@@ -49,6 +46,10 @@ jobs:
           node-version: 20
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Pre-flight config validation
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: bash scripts/validate-tauri-config.sh
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
