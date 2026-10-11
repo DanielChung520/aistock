@@ -17,6 +17,12 @@ _years_cache: dict[str, object] = {
 
 _auction_cache: dict[str, dict[str, object]] = {}
 
+_apply_listing_cache: dict[str, object] = {
+    "cached_at": 0.0,
+    "updated_at": "",
+    "data": [],
+}
+
 FIELD_MAPPING: dict[str, str] = {
     "序號": "sequence",
     "開標日期": "opening_date",
@@ -92,6 +98,8 @@ def _to_iso_date(value: str) -> str:
         day = int(parts[2])
     except ValueError:
         return text
+    if year < 200:
+        year += 1911
     return f"{year:04d}-{month:02d}-{day:02d}"
 
 
@@ -264,4 +272,156 @@ async def get_auction_announcements(year: str | None = Query(default=None)) -> d
         "year": target_year,
         "updated_at": updated_at,
         "title": title,
+    }
+
+
+APPLY_LISTING_FIELD_MAPPING: dict[str, str] = {
+    "索引": "sequence",
+    "公司代號": "company_code",
+    "公司簡稱": "company_name",
+    "申請日期": "application_date",
+    "董事長": "chairman",
+    "申請時股本(仟元)": "capital_at_application",
+    "上市審議委員會審議日期": "review_meeting_date",
+    "交易所董事會通過上市日期": "board_approval_date",
+    "上市契約報請主管機關備查(主管機關核准)日期": "contract_filing_date",
+    "股票上市買賣日期": "listing_date",
+    "承銷商": "lead_broker",
+    "承銷價": "underwriting_price",
+    "備註": "notes",
+}
+
+APPLY_LISTING_DATE_FIELDS = {
+    "application_date",
+    "review_meeting_date",
+    "board_approval_date",
+    "contract_filing_date",
+    "listing_date",
+}
+
+APPLY_LISTING_NUMERIC_FIELDS = {
+    "capital_at_application",
+    "underwriting_price",
+}
+
+
+def _infer_apply_listing_category(notes: str, company_name: str) -> str:
+    if "創新板" in notes or "-創" in company_name:
+        return "TIB"
+    if "KY" in company_name or "第一上市" in notes:
+        return "Foreign"
+    return "Local"
+
+
+def _extract_ad_year(iso_date: str) -> int:
+    if not iso_date or len(iso_date) < 4:
+        return 0
+    try:
+        return int(iso_date[:4])
+    except ValueError:
+        return 0
+
+
+def _fetch_apply_listing_all() -> list[dict[str, object]]:
+    upstream_url = "https://www.twse.com.tw/rwd/zh/company/applylisting"
+    with httpx.Client(timeout=30.0, verify=False) as client:
+        response = client.get(
+            upstream_url,
+            headers={
+                "User-Agent": _USER_AGENT,
+                "Accept": "application/json",
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
+
+    if not isinstance(payload, dict) or str(payload.get("stat", "")).lower() != "ok":
+        raise ValueError("TWSE 回傳狀態非 ok")
+
+    fields = payload.get("fields")
+    rows = payload.get("data")
+    if not isinstance(fields, list) or not isinstance(rows, list):
+        raise ValueError("TWSE 回傳格式錯誤")
+
+    mapped_fields = [
+        APPLY_LISTING_FIELD_MAPPING.get(str(field).strip(), str(field).strip())
+        for field in fields
+    ]
+
+    items: list[dict[str, object]] = []
+    for row in rows:
+        if not isinstance(row, list):
+            continue
+        item: dict[str, object] = {}
+        for index, mapped_field in enumerate(mapped_fields):
+            raw_value = str(row[index]).strip() if index < len(row) else ""
+            if mapped_field in APPLY_LISTING_NUMERIC_FIELDS:
+                item[mapped_field] = _clean_numeric(raw_value)
+            elif mapped_field in APPLY_LISTING_DATE_FIELDS:
+                item[mapped_field] = _to_iso_date(raw_value)
+            else:
+                item[mapped_field] = raw_value
+        notes = str(item.get("notes", ""))
+        company_name = str(item.get("company_name", ""))
+        item["category"] = _infer_apply_listing_category(notes, company_name)
+        application_date = str(item.get("application_date", ""))
+        item["application_year"] = _extract_ad_year(application_date)
+        items.append(item)
+
+    return items
+
+
+@router.get("/apply-listing", response_model=None)
+async def get_apply_listing(
+    type: str | None = Query(default=None),
+) -> dict[str, object] | JSONResponse:
+    """已申請上市公司列表 (TWSE apply-listing 公開資料).
+
+    對應 TWSE 頁面: https://www.twse.com.tw/zh/listed/listed/apply-listing.html
+    與 apply-listing.html 同步，但前端可加上「我的關注」欄位 (localStorage)。
+    """
+    cached_at_raw = _apply_listing_cache.get("cached_at", 0.0)
+    cached_at = (
+        float(cached_at_raw)
+        if isinstance(cached_at_raw, int | float | str)
+        else 0.0
+    )
+
+    all_items: list[dict[str, object]]
+    if _is_cache_valid(cached_at):
+        cached_data = _apply_listing_cache.get("data", [])
+        all_items = cached_data if isinstance(cached_data, list) else []
+    else:
+        try:
+            all_items = _fetch_apply_listing_all()
+        except (httpx.HTTPError, ValueError) as exc:
+            return JSONResponse(
+                status_code=502,
+                content={
+                    "data": [],
+                    "total": 0,
+                    "updated_at": _now_utc_iso(),
+                    "error": str(exc),
+                },
+            )
+
+        _apply_listing_cache["data"] = all_items
+        _apply_listing_cache["updated_at"] = _now_utc_iso()
+        _apply_listing_cache["cached_at"] = datetime.now(timezone.utc).timestamp()
+
+    filtered: list[dict[str, object]] = list(all_items)
+    type_value = "All"
+    if isinstance(type, str) and type.strip():
+        normalized = type.strip()
+        if normalized in ("Local", "Foreign", "TIB"):
+            filtered = [item for item in filtered if item.get("category") == normalized]
+            type_value = normalized
+
+    updated_at_value = _apply_listing_cache.get("updated_at", "")
+    return {
+        "data": filtered,
+        "total": len(filtered),
+        "type": type_value,
+        "updated_at": updated_at_value,
+        "title": "申請上市公司",
     }

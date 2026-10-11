@@ -204,48 +204,47 @@ export default function AnnouncementsPage() {
   }
 
   return (
-    <AppShell>
-      <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-4 md:space-y-6">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0 mb-2 md:mb-6">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold">競拍公告</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+    <AppShell title="競拍公告">
+      <div className="h-full flex flex-col p-4 md:p-6 gap-4 md:gap-6">
+        <div className="shrink-0 space-y-4 md:space-y-6">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0">
+            <p className="text-sm text-muted-foreground">
               共 {loading ? '--' : announcements.length} 筆資料
             </p>
           </div>
-        </div>
 
-        <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-          <div className="w-full md:w-48">
-            <Select value={selectedYear} onValueChange={setSelectedYear} disabled={loading || availableYears.length === 0}>
-              <SelectTrigger>
-                <SelectValue placeholder="選擇年份" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableYears.map(year => (
-                  <SelectItem key={year} value={year.toString()}>{year} 年</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+            <div className="w-full md:w-48">
+              <Select value={selectedYear} onValueChange={setSelectedYear} disabled={loading || availableYears.length === 0}>
+                <SelectTrigger>
+                  <SelectValue placeholder="選擇年份" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears.map(year => (
+                    <SelectItem key={year} value={year.toString()}>{year} 年</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="relative w-full md:w-72">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="搜尋代號或名稱..."
-              className="pl-9 w-full"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value)
-                setCurrentPage(1)
-              }}
-            />
+            <div className="relative w-full md:w-72">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="搜尋代號或名稱..."
+                className="pl-9 w-full"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setCurrentPage(1)
+                }}
+              />
+            </div>
           </div>
         </div>
 
         {loading && (
-          <Card>
+          <Card className="shrink-0">
             <CardContent className="space-y-3 py-6">
               {Array.from({ length: 10 }).map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />
@@ -255,7 +254,7 @@ export default function AnnouncementsPage() {
         )}
 
         {error && !loading && (
-          <Card className="border-destructive">
+          <Card className="shrink-0 border-destructive">
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <AlertCircle className="h-12 w-12 text-destructive/80 mb-4" />
               <p className="text-lg font-medium text-destructive">{error}</p>
@@ -267,7 +266,7 @@ export default function AnnouncementsPage() {
         )}
 
         {!loading && !error && filteredAnnouncements.length === 0 && (
-          <Card>
+          <Card className="shrink-0">
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <Search className="h-12 w-12 text-muted-foreground/30 mb-4" />
               <p className="text-lg font-medium text-muted-foreground">找不到符合的競拍資料</p>
@@ -277,9 +276,9 @@ export default function AnnouncementsPage() {
         )}
 
         {!loading && !error && filteredAnnouncements.length > 0 && (
-          <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
+          <Card className="flex-1 min-h-0 gap-0 overflow-hidden">
+            <CardContent className="p-0 flex-1 min-h-0 flex flex-col">
+              <div className="overflow-auto flex-1 min-h-0">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -360,7 +359,7 @@ export default function AnnouncementsPage() {
                 </Table>
               </div>
 
-              <div className="flex items-center justify-between px-4 py-4 border-t">
+              <div className="flex items-center justify-between px-4 py-4 border-t shrink-0">
                 <div className="text-sm text-muted-foreground hidden sm:block">
                   顯示 {(currentPage - 1) * ITEMS_PER_PAGE + 1} 至{' '}
                   {Math.min(currentPage * ITEMS_PER_PAGE, filteredAnnouncements.length)} 筆，共 {filteredAnnouncements.length} 筆

@@ -67,22 +67,19 @@ export default function MyBidsPage() {
   if (!mounted) return null
 
   return (
-    <AppShell>
-      <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-4 md:space-y-6">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0 mb-2 md:mb-6">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold">我的競拍</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              共 {savedBids.length} 筆追蹤
-            </p>
-          </div>
+    <AppShell title="我的競拍">
+      <div className="h-full flex flex-col p-4 md:p-6 gap-4 md:gap-6">
+        <div className="shrink-0 flex items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">
+            共 {savedBids.length} 筆追蹤
+          </p>
           <Link href="/auction/announcements">
             <Button variant="outline">返回競拍公告</Button>
           </Link>
         </div>
 
         {savedBids.length === 0 ? (
-          <Card>
+          <Card className="shrink-0">
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <Star className="h-12 w-12 text-muted-foreground/30 mb-4" />
               <p className="text-lg font-medium text-muted-foreground">尚未追蹤任何競拍項目</p>
@@ -93,9 +90,9 @@ export default function MyBidsPage() {
             </CardContent>
           </Card>
         ) : (
-          <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
+          <Card className="flex-1 min-h-0 gap-0 overflow-hidden">
+            <CardContent className="p-0 flex-1 min-h-0 flex flex-col">
+              <div className="overflow-auto flex-1 min-h-0">
                 <Table>
                   <TableHeader>
                     <TableRow>
