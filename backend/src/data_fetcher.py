@@ -38,6 +38,27 @@ def _parse_yfinance_index(idx) -> str:
     return ts.strftime("%Y-%m-%d")
 
 
+def _merge_sorted(cached: list[dict], incoming: list[dict], key: str) -> list[dict]:
+    """Merge ``incoming`` bars into ``cached``, de-duplicated by ``key`` and sorted ascending.
+
+    ``cached`` comes from ArangoDB already ordered; ``incoming`` is freshly fetched
+    from yfinance. Blindly appending ``incoming`` onto ``cached`` leaves the result
+    out of order whenever yfinance returns a bar older than a cached row (e.g. a
+    real early bar such as 2007-12-31 inside a 200-month window). The frontend feeds
+    this straight to lightweight-charts' ``setData``, which asserts strictly
+    ascending time and throws otherwise — blanking the whole chart. Re-sorting here
+    is what keeps the payload valid.
+    """
+    seen = {r[key] for r in cached}
+    merged = list(cached)
+    for r in incoming:
+        if r[key] not in seen:
+            seen.add(r[key])
+            merged.append(r)
+    merged.sort(key=lambda r: r[key])
+    return merged
+
+
 # ── ArangoDB helpers ──────────────────────────────────────────
 
 def _ensure_collections() -> None:
@@ -189,12 +210,9 @@ def fetch_daily_history(
             "volume": int(row["Volume"]),
         })
 
-    # Merge with cached (avoid duplicates)
+    # Merge with cached (avoid duplicates), keeping strict ascending date order
     cached_dates = {r["date"] for r in cached}
-    merged = list(cached)
-    for r in records:
-        if r["date"] not in cached_dates:
-            merged.append(r)
+    merged = _merge_sorted(cached, records, "date")
 
     # Store new records back to ArangoDB
     new_records = [r for r in records if r["date"] not in cached_dates]
@@ -254,12 +272,7 @@ def fetch_minute_history(
             if new_records:
                 _store_minute(symbol, new_records)
 
-            merged_1m = list(cached_1m)
-            for r in yf_records:
-                if r["datetime"] not in cached_dts:
-                    merged_1m.append(r)
-
-            cached_1m = merged_1m
+            cached_1m = _merge_sorted(cached_1m, yf_records, "datetime")
 
     # Aggregate from 1m to requested interval
     if interval == "1m":
