@@ -32,22 +32,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # RUNNER_TEMP 是反斜線路徑（D:\a\_temp\...），Git Bash 的 tar 會把
-          # `D:` 誤判成遠端 host（"Cannot connect to D:"）；轉正斜線給 bash 工具
-          # 與原生 exe（arangod.exe）都能用。
-          RT=$(printf '%s' "$RUNNER_TEMP" | tr '\\' '/')
+          # GNU tar 會把 `D:` 當成遠端 host，故解壓用 python；路徑分兩版：
+          #   RT_WIN  (D:/...) 給 python 與原生 exe（arangod.exe）
+          #   RT_UNIX (/d/...) 給 bash 工具（find）
+          RT_WIN=$(printf '%s' "$RUNNER_TEMP" | tr '\\' '/')
+          RT_UNIX=$(cygpath -u "$RUNNER_TEMP")
           # ArangoDB 3.12+ 不再出 Windows 套件，3.11.14 是最後一版（EOL，僅離線版使用）
-          curl -sL -o "$RT/arango.zip" \
+          curl -sL -o "$RT_WIN/arango.zip" \
             "https://download.arangodb.com/arangodb311/Community/Windows/ArangoDB3-3.11.14_win64.zip"
-          tar -xf "$RT/arango.zip" -C "$RT"
-          ARANGO_BIN=$(find "$RT" -name arangod.exe | head -1)
+          python -m zipfile -e "$RT_WIN/arango.zip" "$RT_WIN"
+          ARANGO_BIN_UNIX=$(find "$RT_UNIX" -name arangod.exe | head -1)
+          ARANGO_BIN=$(cygpath -w "$ARANGO_BIN_UNIX")
           ARANGO_HOME=$(dirname "$(dirname "$ARANGO_BIN")")
-          mkdir -p "$RT/arango-data" "$RT/arango-apps"
+          mkdir -p "$RT_WIN/arango-data" "$RT_WIN/arango-apps"
           "$ARANGO_BIN" --server.endpoint tcp://127.0.0.1:8530 \
-            --database.directory "$RT/arango-data" \
+            --database.directory "$RT_WIN/arango-data" \
             --server.authentication false \
             --javascript.startup-directory "$ARANGO_HOME/js" \
-            --javascript.app-path "$RT/arango-apps" &
+            --javascript.app-path "$RT_WIN/arango-apps" &
           ARANGO_PID=$!
           trap 'kill ${BACKEND_PID:-} ${ARANGO_PID:-} 2>/dev/null || true' EXIT
           for i in $(seq 1 30); do
