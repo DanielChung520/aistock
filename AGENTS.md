@@ -22,6 +22,8 @@ aiStock/
 │   │   │       ├── stocks/[...path]/  # → /api/stocks/*
 │   │   │       ├── market/[...path]/  # → /api/market/*
 │   │   │       ├── watchlist/         # → /api/watchlist
+│   │   │       ├── system-settings/   # 系統設定 (LLM provider 等) GET/PUT → ArangoDB
+│   │   │       ├── indicators/        # GET /api/indicators → 讀 .docs/indicators/*.json (指標知識庫)
 │   │   │       ├── menu/             # Menu CRUD (Phase 1, direct ArangoDB)
 │   │   │       └── docs/[...key]/    # GET /api/docs/<key> → SeaweedFS aistock-reports (ow 報告連結)
 │   │   ├── components/
@@ -32,9 +34,11 @@ aiStock/
 │   │   │   └── dashboard/      # Dashboard components
 │   │   ├── lib/
 │   │   │   ├── arangodb.ts     # ArangoDB connection singleton
-│   │   │   └── utils.ts        # Utility functions (cn, etc.)
+│   │   │   ├── utils.ts        # Utility functions (cn, etc.)
+│   │   │   └── system-settings-defaults.ts  # LLM provider presets/型別 (6 家, 與 route 共用)
 │   │   ├── hooks/
-│   │   │   └── use-indicator-settings.ts  # Indicator settings hook (localStorage)
+│   │   │   ├── use-indicator-settings.ts  # Indicator settings hook (localStorage)
+│   │   │   └── use-system-settings.ts     # 系統設定 hook (localStorage 快取 + ArangoDB 持久化)
 │   │   └── types/
 │   │       ├── menu.ts         # Menu type definitions
 │   │       └── stock.ts        # Stock type definitions
@@ -50,11 +54,13 @@ aiStock/
 │   │   ├── db.py               # ArangoDB connection (python-arango)
 │   │   ├── models.py           # Pydantic models
 │   │   ├── indicators.py       # MA/KD/RSI calculation functions
+│   │   ├── llm.py              # OpenAI-compatible LLM client (stateless, 設定由 router 傳入)
 │   │   ├── rate_limiter.py     # TWSE rate limiter (3 req/5 sec)
 │   │   └── routers/
 │   │       ├── stocks.py       # /search, /history, /indicators, /analysis
 │   │       ├── watchlist.py    # GET/POST/DELETE /watchlist
-│   │       └── market.py       # /taiex endpoint
+│   │       ├── market.py       # /taiex endpoint
+│   │       └── strategy.py     # /ai-suggest-stocks (LLM 選股建議)
 │   ├── scripts/
 │   │   ├── seed_stock_codes.py # Seed 1845 stocks from twstock.codes
 │   │   └── daily_update.py     # Daily batch update (Wave 4 pending)
@@ -62,9 +68,54 @@ aiStock/
 │   ├── .venv/                  # Python virtual environment
 │   ├── pyproject.toml          # Python project metadata
 │   └── requirements.txt        # pip dependencies
+├── .docs/                       # 知識庫 / 設計文件
+│   └── indicators/              # ★ 指標知識庫 (每指標一份 JSON) — 見下方專節
+│       ├── {metric}.json        # 64 份指標定義 (metric/公式/參數/可執行性/圖譜關係)
+│       ├── SCHEMA.md            # JSON schema 與欄位規範
+│       ├── TA-LIB-INVENTORY.md  # TA-Lib 盤點 (A/B/C/D 分級)
+│       ├── FINLAB-INVENTORY.md  # FinLab 盤點 (台股特有補源)
+│       └── RAG.md / GRAPH.md    # 檢索層與圖譜設計
 ├── .sisyphus/                  # Work plans & drafts
 └── AGENTS.md                   # This file
 ```
+
+---
+
+## 指標知識庫（Indicator Knowledge Base）
+
+指標知識庫是「指標領域的 source of truth」，供前端 `/indicators` 頁面、後端
+`indicator_rag.py` 檢索層共用。**新增/修改指標一律改這些 JSON，不是改 code。**
+
+### 保存路徑
+
+| 內容 | 路徑 | 說明 |
+|---|---|---|
+| 指標定義 | `.docs/indicators/{metric}.json` | 每指標一份，64 份。欄位規範見 `SCHEMA.md` |
+| Schema 規範 | `.docs/indicators/SCHEMA.md` | JSON 欄位定義、來源規範、已實作對照表 |
+| TA-Lib 盤點 | `.docs/indicators/TA-LIB-INVENTORY.md` | A/B/C/D 分級，定義收錄範圍 |
+| FinLab 補源 | `.docs/indicators/FINLAB-INVENTORY.md` | 台股特有指標（乖離率、營收、法人等） |
+| 檢索設計 | `.docs/indicators/RAG.md` / `GRAPH.md` | 檢索層 API 與指標圖譜設計 |
+
+### 消費端（讀取同一份 JSON）
+
+- **前端 API**：`frontend/src/app/api/indicators/route.ts` → `GET /api/indicators`，
+  路徑用 `INDICATOR_KB_PATH` env 覆寫，預設 `{repo}/.docs/indicators`。
+  頁面：`frontend/src/app/indicators/page.tsx`（依 `implementation.implemented` 篩「僅已實作」）。
+- **後端檢索層**：`backend/src/indicator_rag.py` → embedding 檢索，可執行性以
+  `INDICATOR_CATALOG`（`backend/src/strategy.py`）為權威：JSON 標 `implemented=true` 且
+  metric 在 catalog（或 `catalog_metric` 映射到 catalog）才列為可執行。
+
+### 維護規則
+
+- 新增指標：複製既有 JSON 改 `metric`/`name`/`formula`/`parameters`/`signals`，對照
+  `TA-LIB-INVENTORY.md` 分級決定 `implementation.implemented`。
+- 可執行性必須與 `INDICATOR_CATALOG` 同步——JSON 標 `implemented=true` 但 catalog 無此
+  metric 時，LLM 生成的條件會被 `_validate_conditions` 丟棄。現況（2026-08 已接線）：
+  `INDICATOR_CATALOG` 66 metric，`compute_snapshot()` 全部計算（`indicators.py` 34 +
+  `indicators_ext.py` 32）；知識庫 64 JSON 中 62 個可執行（`macd`/`stochrsi`/`aroon`
+  以一對多展開成 catalog 的 3/2/2 個 metric）。`beta`/`correl` 需大盤基準序列
+  （`stock_daily` 無台指期/指數資料），維持 `implemented=false`，日後大盤資料入庫再接入。
+- 公式以 TA-Lib 為基準，台股慣例（扣抵值、量比、9/3/3）見 `notes`；FinLab 僅整理公式不複製 code。
 
 ---
 
@@ -223,7 +274,7 @@ cd frontend && docker compose up -d
 - ArangoDB runs via Docker Compose on **port 8530** (db=`aistock`, user=`root`, pwd=`aistock2024`).
 - Frontend uses **arangojs** (singleton in `src/lib/arangodb.ts`) for direct reads (menu collections).
 - Backend uses **python-arango** (singleton in `src/db.py`) for stock data reads/writes.
-- Collections: `stock_codes` (1845 docs), `stock_daily`, `watchlist` (cap 50), `menu_items`, `menu_groups`.
+- Collections: `stock_codes` (1845 docs), `stock_daily`, `watchlist` (cap 50), `menu_items`, `menu_groups`, `system_settings` (LLM/系統設定 singleton doc `_key: "system"`).
 - Always use AQL parameterized queries — never f-string or template literal injection.
 
 ---
@@ -249,4 +300,6 @@ Next.js (port 33300) → API routes (proxy) → FastAPI (port 38000) → twstock
 - **G10**: Indicator settings stored in localStorage key `aistock-indicator-settings` with versioned schema.
 - **G11**: Use lightweight-charts v5 native pane API (`addSeries(type, opts, paneIndex)`). Do NOT create multiple chart instances.
 - **G12**: Minute-data indicators use same calculation functions as daily.
+- **G13**: ALL AI/LLM calls in this project MUST use the LLM connection settings from 系統設定 (系統設置 → 一般設定). Settings are persisted in ArangoDB `system_settings` collection (singleton `_key: "system"`, schema in `frontend/src/lib/system-settings-defaults.ts`) and served to the frontend via `GET/PUT /api/system-settings` + `use-system-settings` hook (localStorage as cache/migration source). Backend `llm.py` `chat_completion()` is **stateless**: the router MUST receive the settings object from the frontend request (`llm.baseUrl / model / apiKey / temperature / contextWindow`) and pass it in — never read env vars or hardcode provider/model/base_url/api_key on the backend. **例外**：右下角「AI 助手」為獨立的 opencode-web（ow）執行環境（systemd `ow-default.service`，port 14096，`OW_LOCK=1` 鎖定 aistock worktree），其模型/API Key 於 ow 內設定，不屬本條約束；勿將其改接系統設定。
+- **G14**: LLM providers are exactly 6: `gemini`, `openai`, `anthropic`, `opencode-zen`, `opencode-go`, `minimax`. `opencode-zen` / `opencode-go` fall back to the local dllm service (`http://localhost:11400/v1`, models Qwen3-8B-AWQ etc. — see `/home/daniel/github/dllm`). New providers must be added to `system-settings-defaults.ts` (presets + model lists) and validated by `migrateSettings`.
 - **G15**: 右下角 ow「AI 助手」以 `analyst` agent 執行（ow config `~/.config/ow/default/opencode/opencode.json` 的 `default_agent`）。對 aistock repo **唯讀**：`edit`（涵蓋 `edit`/`write`/`patch`）全 `deny`，僅暫存區 `~/.config/ow/default/.tmp/aistock/**` 可寫（需同時 `external_directory` allow）。分析師**腳本優先**——可重用腳本放 `~/.config/ow/default/.tmp/aistock/scripts/`（`screen.sh` / `activity.sh` / `upload_report.py`），產出 HTML 報告上傳 SeaweedFS bucket `aistock-reports`，並以 `https://stk.k84.org/api/docs/<key>` 回覆連結（前端 proxy `frontend/src/app/api/docs/[...key]/route.ts` → filer `:8888/buckets/aistock-reports/<key>`；env `SEAWEEDFS_FILER_URL` / `SEAWEEDFS_REPORT_BUCKET`）。全體 agent 政策檔為 `~/.config/ow/default/opencode/policy/AGENT-POLICY.md`，由 ow 專屬 Hermes 記憶（`~/.config/ow/default/opencode/hermes/memory/`）監督。
