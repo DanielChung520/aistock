@@ -3,6 +3,7 @@ import { Inspector } from 'react-dev-inspector';
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { StockTabProvider } from '@/lib/stock-tab-context';
+import { PageTabProvider } from '@/lib/page-tab-context';
 import { AIDrawerProvider } from '@/lib/ai-drawer-context';
 import { UpdateNotifier } from '@/components/update-notifier';
 import { MyStocksDrawerProvider } from '@/lib/my-stocks-drawer-context';
@@ -44,12 +45,14 @@ export default function RootLayout({
         >
           {isDev && <Inspector />}
           <StockTabProvider>
-            <AIDrawerProvider>
-              <MyStocksDrawerProvider>
-                {children}
-                <UpdateNotifier />
-              </MyStocksDrawerProvider>
-            </AIDrawerProvider>
+            <PageTabProvider>
+              <AIDrawerProvider>
+                <MyStocksDrawerProvider>
+                  {children}
+                  <UpdateNotifier />
+                </MyStocksDrawerProvider>
+              </AIDrawerProvider>
+            </PageTabProvider>
           </StockTabProvider>
         </ThemeProvider>
       </body>

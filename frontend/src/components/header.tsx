@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, Mail, Globe, Moon, Sun, Settings, UserCog, SlidersHorizontal, Wrench, Activity, Menu, Clock, RefreshCw } from 'lucide-react';
+import { Bell, Mail, Globe, Moon, Sun, Settings, UserCog, SlidersHorizontal, Wrench, Activity, Menu, Clock, RefreshCw, BarChart3, TableProperties } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -17,11 +17,17 @@ import { useTheme } from 'next-themes';
 import { useState, useEffect } from 'react';
 import { userData } from '@/lib/mock-data'
 import { useUpdateStore } from '@/lib/updater';
+import { useSystemSettingsModal } from '@/lib/system-settings-modal-context';
+import { useScheduleSettingsModal } from '@/lib/schedule-settings-modal-context';
+import { useFeatureSettingsModal } from '@/lib/feature-settings-modal-context';
 
 export function Header({ onMenuClick, title }: { onMenuClick?: () => void; title?: string }) {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const updateStore = useUpdateStore();
+  const { open: openSystemSettings } = useSystemSettingsModal();
+  const { open: openScheduleSettings } = useScheduleSettingsModal();
+  const { open: openFeatureSettings } = useFeatureSettingsModal();
 
   useEffect(() => {
     setMounted(true);
@@ -83,19 +89,24 @@ export function Header({ onMenuClick, title }: { onMenuClick?: () => void; title
                   功能設置
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/admin/settings" className="flex items-center gap-2 cursor-pointer">
-                  <Wrench className="h-4 w-4" />
-                  系統參數
-                </Link>
+              <DropdownMenuItem onClick={openSystemSettings} className="flex items-center gap-2 cursor-pointer">
+                <BarChart3 className="h-4 w-4" />
+                K線設定
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={openScheduleSettings} className="flex items-center gap-2 cursor-pointer">
+                <Clock className="h-4 w-4" />
+                排程設置
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={openFeatureSettings} className="flex items-center gap-2 cursor-pointer">
+                <TableProperties className="h-4 w-4" />
+                特徵值設置
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/admin/schedule" className="flex items-center gap-2 cursor-pointer">
-                  <Clock className="h-4 w-4" />
-                  排程設置
-                </Link>
+              <DropdownMenuItem onClick={openSystemSettings} className="flex items-center gap-2 cursor-pointer">
+                <Wrench className="h-4 w-4" />
+                系統參數
               </DropdownMenuItem>
+
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => updateStore.check()}

@@ -13,7 +13,7 @@ export function AIIconButton({ className }: { className?: string }) {
       <Tooltip>
         <TooltipTrigger asChild>
           <button
-            onClick={open}
+            onClick={() => open()}
             className={cn(
               'h-[45px] w-[45px] rounded-lg flex items-center justify-center transition-all',
               'bg-gradient-to-br from-purple-500 to-blue-500 text-white shadow-sm',

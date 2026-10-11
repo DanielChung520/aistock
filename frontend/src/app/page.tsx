@@ -37,7 +37,10 @@ function buildIndicatorParams(settings: IndicatorSettings): string {
   const params = new URLSearchParams()
   if (settings.ma.enabled) {
     params.set('ma_periods', settings.ma.periods.join(','))
-    params.set('ma_type', settings.ma.type)
+    params.set('ma_lookback', String(settings.ma.lookback))
+    params.set('ma_cooldown', String(settings.ma.cooldown))
+    params.set('ma_buy_slope_min', String(settings.ma.buySlopeMin))
+    params.set('ma_sell_slope_max', String(settings.ma.sellSlopeMax))
   }
   if (settings.kdj.enabled) {
     params.set('kdj_period', String(settings.kdj.period))
@@ -253,7 +256,7 @@ export default function DashboardPage() {
   if (chartExpanded) {
     return (
       <AppShell title="台股儀表板">
-        <div className="p-4 md:p-6 mx-auto max-w-7xl h-[calc(100vh-4rem)] flex flex-col">
+        <div className="p-4 md:p-6 h-[calc(100vh-4rem)] flex flex-col">
           <div className="flex items-center justify-between mb-4 shrink-0">
             <Button
               variant="ghost"
@@ -451,17 +454,8 @@ export default function DashboardPage() {
 
       {/* Stock tab panels — always rendered, visibility toggled */}
       {tabs.map((tab) => (
-        <div key={tab.symbol} className={activeTab === tab.symbol ? '' : 'hidden'}>
-          <div className="p-4 md:p-6 max-w-[100vw] overflow-x-hidden">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mb-3 gap-1 text-muted-foreground hover:text-foreground"
-              onClick={() => setActiveTab(null)}
-            >
-              <ArrowLeft className="h-4 w-4" />
-              返回儀表板
-            </Button>
+        <div key={tab.symbol} className={cn(activeTab === tab.symbol ? 'h-full' : 'hidden')}>
+          <div className="p-4 md:p-6 max-w-[100vw] overflow-x-hidden h-full">
             <StockDetailPanel
               symbol={tab.symbol}
               stockName={tab.name}

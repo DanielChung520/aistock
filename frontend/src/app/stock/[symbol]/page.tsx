@@ -14,7 +14,7 @@ export default function StockDetailPage() {
 
   return (
     <AppShell title={headerTitle}>
-      <div className="p-4 md:p-6 max-w-[100vw] overflow-x-hidden">
+      <div className="p-4 md:p-6 max-w-[100vw] overflow-x-hidden h-full">
         <StockDetailPanel
           symbol={symbol}
           onNameResolved={setStockName}

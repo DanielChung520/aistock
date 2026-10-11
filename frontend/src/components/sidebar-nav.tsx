@@ -2,11 +2,13 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { Home, LayoutGrid, Loader2 } from 'lucide-react'
+import { LayoutGrid, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { getIconComponent } from '@/lib/icon-map'
+import { usePageTabs } from '@/lib/page-tab-context'
+import { FUNCTION_PAGES } from '@/lib/page-tabs'
 import type { MenuItemWithChildren } from '@/types/menu'
 
 type MenuData = {
@@ -16,6 +18,7 @@ type MenuData = {
 export function SidebarNav({ className, onNavClick }: { className?: string; onNavClick?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
+  const { pinPage } = usePageTabs()
   const [menu, setMenu] = useState<MenuData | null>(null)
   const [menuPopoverOpen, setMenuPopoverOpen] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -28,13 +31,18 @@ export function SidebarNav({ className, onNavClick }: { className?: string; onNa
       .finally(() => setLoading(false))
   }, [])
 
-  const goHome = () => {
-    router.push('/')
+  const goPage = (route: string) => {
+    pinPage(route)
+    router.push(route)
     onNavClick?.()
   }
 
   const openMenuItem = (href: string) => {
-    router.push(href)
+    if (/^https?:\/\//i.test(href)) {
+      window.open(href, '_blank', 'noopener,noreferrer')
+    } else {
+      router.push(href)
+    }
     setMenuPopoverOpen(false)
     onNavClick?.()
   }
@@ -42,21 +50,27 @@ export function SidebarNav({ className, onNavClick }: { className?: string; onNa
   return (
     <aside className={cn('w-[60px] shrink-0 h-full flex flex-col items-center py-2 gap-1 bg-card/40 backdrop-blur-sm border-r border-border', className)}>
       <TooltipProvider delayDuration={300}>
-        {/* Top: Home */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={goHome}
-              className={cn(
-                'h-10 w-10 rounded-md flex items-center justify-center transition-colors',
-                pathname === '/' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-              )}
-            >
-              <Home className="h-5 w-5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right">首頁-儀表板</TooltipContent>
-        </Tooltip>
+        {FUNCTION_PAGES.map((page) => {
+          const Icon = page.icon
+          const isActive =
+            page.route === '/' ? pathname === '/' : pathname === page.route
+          return (
+            <Tooltip key={page.route}>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => goPage(page.route)}
+                  className={cn(
+                    'h-10 w-10 rounded-md flex items-center justify-center transition-colors',
+                    isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">{page.title}</TooltipContent>
+            </Tooltip>
+          )
+        })}
 
         {/* Spacer */}
         <div className="flex-1" />

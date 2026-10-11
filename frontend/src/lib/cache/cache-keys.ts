@@ -38,7 +38,7 @@ const TTL_MS: Record<CacheCategory, number> = {
   'stock-catalog':           24 * 60 * 60 * 1000,      // 24 小時（1845+ 股票）
   'news-today':              10 * 60 * 1000,           // 10 分鐘
   'menu':                    24 * 60 * 60 * 1000,      // 24 小時
-  'watchlist':               0,                          // 不快取
+  'watchlist':               60 * 1000,                   // 1 分鐘（自選股新增/刪除後需 invalidate）
   'search':                  30 * 60 * 1000,            // 30 分鐘
   'strategy-hits':           5 * 60 * 1000,             // 5 分鐘
   'strategy-unread-count':   30 * 1000,                 // 30 秒
@@ -55,7 +55,7 @@ export function ttlFor(category: CacheCategory): number {
  * 範例:
  *   - taiex-history:months=6
  *   - stock-history:2330:months=6
- *   - stock-indicators:2330:months=6&ma_periods=5,10,20,60
+ *   - stock-indicators:2330:months=6&ma_periods=8,21,55,89&ma_lookback=8
  */
 export function makeCacheKey(category: CacheCategory, ...parts: (string | number | undefined | null)[]): string {
   const filtered = parts.filter((p) => p !== undefined && p !== null && p !== '')

@@ -8,30 +8,31 @@ import { PageTabsBar } from '@/components/page-tabs-bar'
 import { RightSidebar } from '@/components/right-sidebar'
 import { Footer } from '@/components/footer'
 import { AIChatModal } from '@/components/ai-chat-modal'
+import { AIDrawer } from '@/components/ai-drawer'
 import { MyStocksDrawer } from '@/components/my-stocks-drawer'
 import { StrategyDrawer } from '@/components/strategy-drawer'
 import { NotificationsDrawer } from '@/components/notifications-drawer'
 import { WatchlistModal } from '@/components/watchlist-modal'
+import { SystemSettingsModal } from '@/components/system-settings-modal'
+import { ScheduleSettingsModal } from '@/components/schedule-settings-modal'
+import { FeatureSettingsModal } from '@/components/feature-settings-modal'
 import { WatchlistModalProvider } from '@/lib/watchlist-modal-context'
 import { StrategyDrawerProvider } from '@/lib/strategy-drawer-context'
 import { NotificationsDrawerProvider } from '@/lib/notifications-drawer-context'
+import { useAIDrawer, AI_DRAWER_WIDTH } from '@/lib/ai-drawer-context'
+import { SystemSettingsModalProvider, useSystemSettingsModal } from '@/lib/system-settings-modal-context'
+import { ScheduleSettingsModalProvider, useScheduleSettingsModal } from '@/lib/schedule-settings-modal-context'
+import { FeatureSettingsModalProvider, useFeatureSettingsModal } from '@/lib/feature-settings-modal-context'
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet'
-
-export function AppShell({ children, title }: { children: React.ReactNode; title?: string }) {
-  return (
-    <StrategyDrawerProvider>
-      <NotificationsDrawerProvider>
-        <WatchlistModalProvider>
-          <AppShellInner title={title}>{children}</AppShellInner>
-        </WatchlistModalProvider>
-      </NotificationsDrawerProvider>
-    </StrategyDrawerProvider>
-  )
-}
 
 function AppShellInner({ children, title }: { children: React.ReactNode; title?: string }) {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
   const pathname = usePathname()
+  const { isOpen: settingsOpen, close: closeSettings } = useSystemSettingsModal()
+  const { isOpen: scheduleOpen, close: closeSchedule } = useScheduleSettingsModal()
+  const { isOpen: featuresOpen, close: closeFeatures } = useFeatureSettingsModal()
+  const { isOpen: aiOpen, mode: aiMode } = useAIDrawer()
+  const aiPushed = aiOpen && aiMode === 'drawer'
 
   React.useEffect(() => {
     setMobileMenuOpen(false)
@@ -49,14 +50,17 @@ function AppShellInner({ children, title }: { children: React.ReactNode; title?:
 
       <PageTabsBar />
 
-      <div className="flex flex-1 min-h-0">
+      <div
+        className="flex flex-1 min-h-0 transition-[padding-right] duration-300 ease-out"
+        style={{ paddingRight: aiPushed ? AI_DRAWER_WIDTH : 0 }}
+      >
         <div className="hidden lg:block w-[60px] shrink-0 h-full">
           <SidebarNav className="h-full w-full" />
         </div>
 
         <div className="flex-1 flex flex-col min-w-0">
           <Header onMenuClick={() => setMobileMenuOpen(true)} title={title} />
-          <main className="flex-1 min-h-0 overflow-hidden">
+          <main className="flex-1 min-h-0 overflow-auto">
             {children}
           </main>
           <Footer />
@@ -70,8 +74,30 @@ function AppShellInner({ children, title }: { children: React.ReactNode; title?:
       <MyStocksDrawer />
       <StrategyDrawer />
       <NotificationsDrawer />
+      <AIDrawer />
       <AIChatModal />
       <WatchlistModal />
+      <SystemSettingsModal isOpen={settingsOpen} onClose={closeSettings} />
+      <ScheduleSettingsModal isOpen={scheduleOpen} onClose={closeSchedule} />
+      <FeatureSettingsModal isOpen={featuresOpen} onClose={closeFeatures} />
     </div>
+  )
+}
+
+export function AppShell({ children, title }: { children: React.ReactNode; title?: string }) {
+  return (
+      <StrategyDrawerProvider>
+        <NotificationsDrawerProvider>
+          <WatchlistModalProvider>
+            <SystemSettingsModalProvider>
+              <ScheduleSettingsModalProvider>
+                <FeatureSettingsModalProvider>
+                  <AppShellInner title={title}>{children}</AppShellInner>
+                </FeatureSettingsModalProvider>
+              </ScheduleSettingsModalProvider>
+            </SystemSettingsModalProvider>
+          </WatchlistModalProvider>
+        </NotificationsDrawerProvider>
+      </StrategyDrawerProvider>
   )
 }
