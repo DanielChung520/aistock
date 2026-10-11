@@ -10,7 +10,14 @@ from src.finmind import (
     fetch_shareholding,
     fetch_short_sale_balances,
 )
-from src.indicators import calculate_bollinger, calculate_kdj, calculate_ma, calculate_macd, calculate_rsi
+from src.indicators import (
+    calculate_bollinger,
+    calculate_kdj,
+    calculate_ma_daniel,
+    calculate_macd,
+    calculate_rsi,
+    calculate_signal_accuracy,
+)
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
 
@@ -64,8 +71,12 @@ async def get_stock_history(
 async def get_indicators(
     stock_id: str,
     months: int = Query(default=6, ge=1, le=240),
-    ma_periods: str = Query(default="5,10,20,60"),
+    ma_periods: str = Query(default="8,21,55,89"),
     ma_type: str = Query(default="sma"),
+    ma_lookback: int = Query(default=8, ge=1, le=250),
+    ma_cooldown: int = Query(default=1, ge=0, le=50),
+    ma_buy_slope_min: float = Query(default=0.05, ge=0.0, le=10.0),
+    ma_sell_slope_max: float = Query(default=0.02, ge=0.0, le=10.0),
     kdj_period: int = Query(default=9, ge=2, le=250),
     kdj_k_smooth: int = Query(default=3, ge=1, le=50),
     kdj_d_smooth: int = Query(default=3, ge=1, le=50),
@@ -84,9 +95,9 @@ async def get_indicators(
         parsed_periods = [int(p.strip()) for p in ma_periods.split(",") if p.strip()]
         parsed_periods = [p for p in parsed_periods if 2 <= p <= 250]
         if not parsed_periods:
-            parsed_periods = [5, 10, 20, 60]
+            parsed_periods = [8, 21, 55, 89]
     except ValueError:
-        parsed_periods = [5, 10, 20, 60]
+        parsed_periods = [8, 21, 55, 89]
 
     all_periods = parsed_periods + [kdj_period, rsi_period, macd_slow, bb_period]
     warmup_months = min(max(max(all_periods) * 2 // 20, 3), 24)
@@ -105,8 +116,21 @@ async def get_indicators(
     highs = [float(item["high"]) for item in data]
     lows = [float(item["low"]) for item in data]
     closes = [float(item["close"]) for item in data]
+    volumes = [float(item.get("volume") or 0) for item in data]
 
-    ma_all = calculate_ma(dates, closes, parsed_periods, ma_type=ma_type)
+    ma_all = calculate_ma_daniel(
+        dates,
+        highs,
+        lows,
+        closes,
+        volumes,
+        periods=parsed_periods,
+        lookback=ma_lookback,
+        ma_type=ma_type,
+        cooldown=ma_cooldown,
+        buy_slope_min=ma_buy_slope_min,
+        sell_slope_max=ma_sell_slope_max,
+    )
     kdj_all = calculate_kdj(
         dates,
         highs,
@@ -127,7 +151,16 @@ async def get_indicators(
     macd = [item for item in macd_all if str(item["date"]) >= range_start]
     bollinger = [item for item in bollinger_all if str(item["date"]) >= range_start]
 
-    return {"ma": ma, "kdj": kdj, "rsi": rsi, "macd": macd, "bollinger": bollinger}
+    ma_accuracy = calculate_signal_accuracy(ma_all, highs, lows, closes)
+
+    return {
+        "ma": ma,
+        "kdj": kdj,
+        "rsi": rsi,
+        "macd": macd,
+        "bollinger": bollinger,
+        "ma_accuracy": ma_accuracy,
+    }
 
 
 @router.get("/{stock_id}/minute-indicators")
@@ -135,8 +168,12 @@ async def get_minute_indicators(
     stock_id: str,
     interval: str = Query(default="5m"),
     days: int = Query(default=30, ge=1, le=60),
-    ma_periods: str = Query(default="5,10,20,60"),
+    ma_periods: str = Query(default="8,21,55,89"),
     ma_type: str = Query(default="sma"),
+    ma_lookback: int = Query(default=8, ge=1, le=250),
+    ma_cooldown: int = Query(default=1, ge=0, le=50),
+    ma_buy_slope_min: float = Query(default=0.05, ge=0.0, le=10.0),
+    ma_sell_slope_max: float = Query(default=0.02, ge=0.0, le=10.0),
     kdj_period: int = Query(default=9, ge=2, le=250),
     kdj_k_smooth: int = Query(default=3, ge=1, le=50),
     kdj_d_smooth: int = Query(default=3, ge=1, le=50),
@@ -160,9 +197,9 @@ async def get_minute_indicators(
         parsed_periods = [int(p.strip()) for p in ma_periods.split(",") if p.strip()]
         parsed_periods = [p for p in parsed_periods if 2 <= p <= 250]
         if not parsed_periods:
-            parsed_periods = [5, 10, 20, 60]
+            parsed_periods = [8, 21, 55, 89]
     except ValueError:
-        parsed_periods = [5, 10, 20, 60]
+        parsed_periods = [8, 21, 55, 89]
 
     if interval == "1m" and days > 7:
         days = 7
@@ -181,8 +218,21 @@ async def get_minute_indicators(
     highs = [float(item["high"]) for item in data]
     lows = [float(item["low"]) for item in data]
     closes = [float(item["close"]) for item in data]
+    volumes = [float(item.get("volume") or 0) for item in data]
 
-    ma_all = calculate_ma(dates, closes, parsed_periods, ma_type=ma_type)
+    ma_all = calculate_ma_daniel(
+        dates,
+        highs,
+        lows,
+        closes,
+        volumes,
+        periods=parsed_periods,
+        lookback=ma_lookback,
+        ma_type=ma_type,
+        cooldown=ma_cooldown,
+        buy_slope_min=ma_buy_slope_min,
+        sell_slope_max=ma_sell_slope_max,
+    )
     kdj_all = calculate_kdj(
         dates,
         highs,
@@ -203,7 +253,16 @@ async def get_minute_indicators(
     macd = [item for item in macd_all if str(item["date"]) >= range_start]
     bollinger = [item for item in bollinger_all if str(item["date"]) >= range_start]
 
-    return {"ma": ma, "kdj": kdj, "rsi": rsi, "macd": macd, "bollinger": bollinger}
+    ma_accuracy = calculate_signal_accuracy(ma_all, highs, lows, closes)
+
+    return {
+        "ma": ma,
+        "kdj": kdj,
+        "rsi": rsi,
+        "macd": macd,
+        "bollinger": bollinger,
+        "ma_accuracy": ma_accuracy,
+    }
 
 @router.get("/{stock_id}/analysis/best-four-point")
 async def get_best_four_point(stock_id: str) -> dict[str, object]:

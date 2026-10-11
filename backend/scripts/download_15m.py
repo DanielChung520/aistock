@@ -57,7 +57,10 @@ def _is_fresh(last: str, now: datetime) -> bool:
     if last >= (now - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S"):
         return True
     market_closed = now >= now.replace(hour=14, minute=30, second=0, microsecond=0)
-    return market_closed and last[:10] == now.strftime("%Y-%m-%d")
+    if not market_closed or last[:10] != now.strftime("%Y-%m-%d"):
+        return False
+    # 收盤後只有當日最後一根 15m（13:15）才算新鮮，早盤 partial bar 仍需補抓
+    return last[11:16] >= "13:15"
 
 
 def _fresh_ids(ids: list[str], now: datetime) -> set[str]:
