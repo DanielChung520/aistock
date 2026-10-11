@@ -1,0 +1,64 @@
+{
+  "metric": "atr",
+  "name": "ATR 平均真實波幅",
+  "category": "volatility",
+  "definition": "衡量一段時間內價格的真實波動幅度（含跳空缺口），是停損設定與波動率判斷的基礎指標。數值越大代表波動越劇烈。",
+  "formula": "TR = max(H - L, |H - Cprev|, |L - Cprev|)；ATR = 以 Wilder 平滑計算 TR 的平均：ATR(t) = (ATR(t-1) × (period - 1) + TR(t)) / period",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 14,
+      "range": [
+        1,
+        100
+      ],
+      "tw_convention": "台股常用 14；短線看 7，長線看 21"
+    }
+  ],
+  "inputs": [
+    "high",
+    "low",
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      "∞"
+    ],
+    "meaning": "數值越大波動越大；常用於停損寬度（如 1.5~2 倍 ATR）"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_atr",
+    "catalog_metric": "atr"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "波動擴大",
+      "condition": "ATR 連續上升或創近期新高"
+    },
+    {
+      "pattern": "波動收縮",
+      "condition": "ATR 連續下降（盤整蓄勢，可能即將突破）"
+    }
+  ],
+  "combines_with": [
+    "natr",
+    "sar",
+    "supertrend",
+    "bb_width"
+  ],
+  "notes": "來源：TA-Lib ATR（Wilder）。尚未實作於 compute_snapshot。台股慣例：ATR(14) 為預設；突破策略中「ATR 低 + 量縮」為整理訊號，配合三盤突破型態使用。",
+  "tags": [
+    "波動",
+    "波動擴大",
+    "波動收縮",
+    "natr",
+    "sar",
+    "supertrend",
+    "bb_width"
+  ],
+  "llm_intent": "衡量價格波動幅度與風險，用於停損設定與波動率判斷（ATR 平均真實波幅）"
+}

@@ -1,0 +1,73 @@
+{
+  "metric": "ppo",
+  "name": "PPO 百分比價格振盪指標",
+  "category": "momentum",
+  "definition": "將快慢兩條指數移動平均的差額除以慢線，轉成百分比形式，是 APO 的標準化版本。可跨股比較動能強弱，穿越 0 軸為買賣訊號。",
+  "formula": "PPO = (EMA(fast) - EMA(slow)) / EMA(slow) × 100；即快慢 EMA 差額佔慢線的百分比",
+  "parameters": [
+    {
+      "name": "fastperiod",
+      "default": 12,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股慣用 12（與 MACD 一致）"
+    },
+    {
+      "name": "slowperiod",
+      "default": 26,
+      "range": [
+        2,
+        200
+      ],
+      "tw_convention": "台股慣用 26（與 MACD 一致）"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": null,
+    "meaning": ">0 多方動能（百分比），<0 空方動能；數值越大動能越強"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_ppo",
+    "catalog_metric": "ppo"
+  },
+  "depends_on": [
+    "ema"
+  ],
+  "signals": [
+    {
+      "pattern": "多方",
+      "condition": "PPO > 0"
+    },
+    {
+      "pattern": "空方",
+      "condition": "PPO < 0"
+    },
+    {
+      "pattern": "動能反轉",
+      "condition": "PPO 由下往上穿越 0 軸（買進訊號）"
+    }
+  ],
+  "combines_with": [
+    "apo",
+    "macd",
+    "rsi"
+  ],
+  "notes": "來源：TA-Lib PPO。台股慣例：PPO 為百分比形式，可在不同價位股票間橫向比較動能（與 ROC 同理）；12/26 參數與 MACD 一致，可互為確認。尚未實作於 compute_snapshot，需新增。",
+  "tags": [
+    "動能",
+    "多方",
+    "空方",
+    "動能反轉",
+    "apo",
+    "macd",
+    "rsi"
+  ],
+  "llm_intent": "衡量價格變動的動能與速度，用於尋找超買超賣或動能持續性（PPO 百分比價格振盪指標）"
+}

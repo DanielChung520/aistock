@@ -1,0 +1,61 @@
+{
+  "metric": "trend",
+  "name": "趨勢權重（A=50 / B=25 / C=0）",
+  "category": "trend",
+  "definition": "由 MA8、MA55、MA89 三條均線的排列關係產出的趨勢強度分級：A（50 分，強多頭排列）、B（25 分，僅短期站上）、C（0 分，空頭），用於量化趨勢結構強弱。",
+  "formula": "trend = 50（MA8 ≥ MA55 ≥ MA89）；25（僅 MA8 ≥ MA55）；0（其他）；即 weight = 50/25/0",
+  "parameters": [],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      50
+    ],
+    "meaning": "50 = A 級強多頭，25 = B 級中性偏多，0 = C 級空頭"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_ma_daniel",
+    "catalog_metric": "trend"
+  },
+  "depends_on": [
+    "ma8",
+    "ma55",
+    "ma89"
+  ],
+  "signals": [
+    {
+      "pattern": "強多頭",
+      "condition": "trend == 50（MA8 ≥ MA55 ≥ MA89）"
+    },
+    {
+      "pattern": "中性",
+      "condition": "trend == 25"
+    },
+    {
+      "pattern": "空頭",
+      "condition": "trend == 0（MA8 < MA55）"
+    }
+  ],
+  "combines_with": [
+    "ma_bull",
+    "buy_signal",
+    "sell_signal",
+    "slope8"
+  ],
+  "notes": "來源：台股自定義（內建），源自 MA Daniel Pine 指標（.docs/indicator001.md）的 weight 欄位。注意：權重判斷使用 MA8 / MA55 / MA89（第一、三、四條均線），不含 MA21；買進訊號在 trend=C 時會被抑制。",
+  "tags": [
+    "趨勢",
+    "強多頭",
+    "中性",
+    "空頭",
+    "ma_bull",
+    "buy_signal",
+    "sell_signal",
+    "slope8"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（趨勢權重（A=50 / B=25 / C=0））"
+}

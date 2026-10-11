@@ -1,0 +1,66 @@
+{
+  "metric": "aroon",
+  "name": "AROON 阿隆指標",
+  "category": "momentum",
+  "definition": "以「距 N 日內最高價/最低價的期數」衡量趨勢年齡與新鮮度，判斷趨勢是否剛發動（新）或已老化（舊）。由 AROON_UP（新高年齡）與 AROON_DOWN（新低年齡）兩條線組成，介於 0~100。",
+  "formula": "AROON_UP = (N - 距 N 日內最高價的期數) / N × 100；AROON_DOWN = (N - 距 N 日內最低價的期數) / N × 100；期數從 0 起算（今日創新高低則為 0）",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 25,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 14（短）或 25（中），25 對應月線級"
+    }
+  ],
+  "inputs": [
+    "high",
+    "low"
+  ],
+  "outputs": {
+    "type": "object",
+    "range": [
+      0,
+      100
+    ],
+    "meaning": "AROON_UP 接近 100 代表剛創 N 日新高（趨勢新）；接近 0 代表距上次新高已久（趨勢舊）"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_aroon",
+    "catalog_metric": "aroon_up / aroon_down"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "多頭啟動",
+      "condition": "AROON_UP 由 0 附近快速上升（近期創新高）"
+    },
+    {
+      "pattern": "空頭啟動",
+      "condition": "AROON_DOWN 由 0 附近快速上升（近期創新低）"
+    },
+    {
+      "pattern": "趨勢轉折",
+      "condition": "AROON_UP 上穿 AROON_DOWN"
+    }
+  ],
+  "combines_with": [
+    "adx",
+    "macd",
+    "ma_bull"
+  ],
+  "notes": "來源：TA-Lib AROON（輸出 AROON_UP / AROON_DOWN 兩線）。台股慣例：與 ADX 互補——ADX 看趨勢強度、AROON 看趨勢新鮮度；高檔 AROON 老化搭配 ADX 轉弱為趨勢末端訊號。尚未實作於 compute_snapshot，需新增。",
+  "tags": [
+    "動能",
+    "多頭啟動",
+    "空頭啟動",
+    "趨勢轉折",
+    "adx",
+    "macd",
+    "ma_bull"
+  ],
+  "llm_intent": "衡量價格變動的動能與速度，用於尋找超買超賣或動能持續性（AROON 阿隆指標）"
+}

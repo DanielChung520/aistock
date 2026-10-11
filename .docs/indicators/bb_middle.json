@@ -1,0 +1,62 @@
+{
+  "metric": "bb_middle",
+  "name": "布林中軌",
+  "category": "volatility",
+  "definition": "布林通道中軌 = 20 日簡單移動平均，是布林通道的基準線，同時具備均線的趨勢判斷功能與支撐壓力意義。",
+  "formula": "BB_middle = SMA(close, 20)",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 20,
+      "range": [
+        2,
+        200
+      ],
+      "tw_convention": "台股慣用 20"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      null
+    ],
+    "meaning": "20日均價；價格在中軌之上偏多、之下偏空"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_bollinger",
+    "catalog_metric": "bb_middle"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "站上中軌",
+      "condition": "price > bb_middle（偏多）"
+    },
+    {
+      "pattern": "跌破中軌",
+      "condition": "price < bb_middle（偏空）"
+    }
+  ],
+  "combines_with": [
+    "bb_upper",
+    "bb_lower",
+    "bb_width",
+    "ma21"
+  ],
+  "notes": "來源：TA-Lib BBANDS。台股慣例：布林(20,2)；中軌即 20 日均線，可與 MA21 互相印證趨勢方向。",
+  "tags": [
+    "波動",
+    "站上中軌",
+    "跌破中軌",
+    "bb_upper",
+    "bb_lower",
+    "bb_width",
+    "ma21"
+  ],
+  "llm_intent": "衡量價格波動幅度與風險，用於停損設定與波動率判斷（布林中軌）"
+}

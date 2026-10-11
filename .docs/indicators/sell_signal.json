@@ -1,0 +1,67 @@
+{
+  "metric": "sell_signal",
+  "name": "MA Daniel 賣出訊號",
+  "category": "trend",
+  "definition": "MA Daniel 指標的賣出訊號：MA21 斜率加速度由正轉負（上揚轉下彎的轉折點），且 MA8 斜率小於 0.02%；訊號後 1 根K棒冷卻期內不重複觸發。",
+  "formula": "sell = (slope21 - slope21[t-1] < 0) AND (slope21[t-1] - slope21[t-2] > 0) AND (slope8 < 0.02%)；且距前次買進訊號 > cooldown（1）根K棒",
+  "parameters": [
+    {
+      "name": "sell_slope_max",
+      "default": 0.02,
+      "range": [
+        0,
+        1
+      ],
+      "tw_convention": "MA Daniel 指標預設 0.02%"
+    },
+    {
+      "name": "cooldown",
+      "default": 1,
+      "range": [
+        0,
+        10
+      ],
+      "tw_convention": "買賣訊號互斥冷卻根數"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "bool",
+    "range": null,
+    "meaning": "true = 出現賣出訊號"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_ma_daniel",
+    "catalog_metric": "sell_signal"
+  },
+  "depends_on": [
+    "ma8",
+    "ma21",
+    "ma55"
+  ],
+  "signals": [
+    {
+      "pattern": "賣出訊號",
+      "condition": "sell_signal is_true"
+    }
+  ],
+  "combines_with": [
+    "buy_signal",
+    "slope8",
+    "slope21",
+    "trend"
+  ],
+  "notes": "來源：台股自定義（內建），源自 MA Daniel Pine 指標（.docs/indicator001.md）。布林（bool）型指標，條件運算子只能用 is_true。賣出後 cooldown 根內買進訊號被抑制（避免隔根反轉）。",
+  "tags": [
+    "趨勢",
+    "賣出訊號",
+    "buy_signal",
+    "slope8",
+    "slope21",
+    "trend"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（MA Daniel 賣出訊號）"
+}

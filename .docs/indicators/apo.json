@@ -1,0 +1,73 @@
+{
+  "metric": "apo",
+  "name": "APO 絕對價格振盪指標",
+  "category": "momentum",
+  "definition": "計算快慢兩條指數移動平均的差額（絕對值），是 MACD DIF 的單線版本，衡量價格動能變化。正值代表快線在上（多方）、負值代表快線在下（空方），穿越 0 軸為買賣訊號。",
+  "formula": "APO = EMA(fast) - EMA(slow)；即快線 EMA 減慢線 EMA 的價格差額",
+  "parameters": [
+    {
+      "name": "fastperiod",
+      "default": 12,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股慣用 12（與 MACD 一致）"
+    },
+    {
+      "name": "slowperiod",
+      "default": 26,
+      "range": [
+        2,
+        200
+      ],
+      "tw_convention": "台股慣用 26（與 MACD 一致）"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": null,
+    "meaning": ">0 多方動能（價格單位），<0 空方動能；值越大差距越大"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_apo",
+    "catalog_metric": "apo"
+  },
+  "depends_on": [
+    "ema"
+  ],
+  "signals": [
+    {
+      "pattern": "多方",
+      "condition": "APO > 0"
+    },
+    {
+      "pattern": "空方",
+      "condition": "APO < 0"
+    },
+    {
+      "pattern": "動能反轉",
+      "condition": "APO 由下往上穿越 0 軸（買進訊號）"
+    }
+  ],
+  "combines_with": [
+    "ppo",
+    "macd",
+    "ema"
+  ],
+  "notes": "來源：TA-Lib APO。台股慣例：APO 為絕對差值（價格單位），高價股與低價股間不可直接比較；跨股比較動能請改用 PPO（百分比版本）。尚未實作於 compute_snapshot，需新增。",
+  "tags": [
+    "動能",
+    "多方",
+    "空方",
+    "動能反轉",
+    "ppo",
+    "macd",
+    "ema"
+  ],
+  "llm_intent": "衡量價格變動的動能與速度，用於尋找超買超賣或動能持續性（APO 絕對價格振盪指標）"
+}

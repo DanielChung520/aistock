@@ -1,0 +1,73 @@
+{
+  "metric": "bb_lower",
+  "name": "布林下軌",
+  "category": "volatility",
+  "definition": "布林通道下軌 = 中軌 - 2 × 標準差，代表價格在統計上的下方波動邊界；價格觸及或跌破下軌代表弱勢或短期超賣。",
+  "formula": "BB_lower = SMA(close, 20) - 2 × σ；σ = sqrt(Σ(C[t] - SMA20)² / 20)（母體標準差）",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 20,
+      "range": [
+        2,
+        200
+      ],
+      "tw_convention": "台股慣用 20"
+    },
+    {
+      "name": "std_dev",
+      "default": 2,
+      "range": [
+        1,
+        5
+      ],
+      "tw_convention": "台股慣用 2"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      null
+    ],
+    "meaning": "下軌價位；價格跌破下軌代表弱勢（可能短期超賣）"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_bollinger",
+    "catalog_metric": "bb_lower"
+  },
+  "depends_on": [
+    "bb_middle"
+  ],
+  "signals": [
+    {
+      "pattern": "跌破下軌",
+      "condition": "price 下穿 bb_lower（cross_below，弱勢）"
+    },
+    {
+      "pattern": "觸及下軌",
+      "condition": "price <= bb_lower"
+    }
+  ],
+  "combines_with": [
+    "bb_middle",
+    "bb_upper",
+    "bb_width",
+    "kdj_d"
+  ],
+  "notes": "來源：TA-Lib BBANDS（calculate_bollinger）。台股慣例：布林(20,2)；跌破下軌搭配 KDJ 低檔可視為短線超跌，但趨勢股可能沿下軌續跌，需搭配 trend 確認。",
+  "tags": [
+    "波動",
+    "跌破下軌",
+    "觸及下軌",
+    "bb_middle",
+    "bb_upper",
+    "bb_width",
+    "kdj_d"
+  ],
+  "llm_intent": "衡量價格波動幅度與風險，用於停損設定與波動率判斷（布林下軌）"
+}

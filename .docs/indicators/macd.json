@@ -1,0 +1,84 @@
+{
+  "metric": "macd",
+  "name": "MACD 指數平滑異同移動平均",
+  "category": "momentum",
+  "definition": "利用快慢兩條 EMA 的差離與其訊號線，判斷趨勢方向與動能變化。DIF 為快慢 EMA 差，DEA 為 DIF 的 EMA，柱狀圖為兩者差。",
+  "formula": "EMA(close, 12) - EMA(close, 26) = DIF；DEA = EMA(DIF, 9)；MACD 柱 = 2 × (DIF - DEA)",
+  "parameters": [
+    {
+      "name": "fast",
+      "default": 12,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股慣用 12/26/9"
+    },
+    {
+      "name": "slow",
+      "default": 26,
+      "range": [
+        2,
+        200
+      ],
+      "tw_convention": "台股慣用 12/26/9"
+    },
+    {
+      "name": "signal",
+      "default": 9,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股慣用 12/26/9"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "object",
+    "range": null,
+    "meaning": "DIF 與 DEA 可正可負；柱為正代表多方動能，為負代表空方動能"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_macd",
+    "catalog_metric": "macd_dif / macd_signal / macd_hist"
+  },
+  "depends_on": [
+    "ema"
+  ],
+  "signals": [
+    {
+      "pattern": "黃金交叉",
+      "condition": "DIF 由下往上穿越 DEA"
+    },
+    {
+      "pattern": "死亡交叉",
+      "condition": "DIF 由上往下穿越 DEA"
+    },
+    {
+      "pattern": "零軸上金叉",
+      "condition": "DIF 在 0 軸上方金叉 DEA（強勢）"
+    }
+  ],
+  "combines_with": [
+    "rsi",
+    "kdj",
+    "ma_bull",
+    "vol_ratio"
+  ],
+  "notes": "來源：TA-Lib MACD。catalog 中拆為三個 metric：macd_dif（DIF）、macd_signal（DEA）、macd_hist（柱）。金叉需用 cross_above 運算子。",
+  "tags": [
+    "動能",
+    "黃金交叉",
+    "死亡交叉",
+    "零軸上金叉",
+    "rsi",
+    "kdj",
+    "ma_bull",
+    "vol_ratio"
+  ],
+  "llm_intent": "衡量價格變動的動能與速度，用於尋找超買超賣或動能持續性（MACD 指數平滑異同移動平均）"
+}

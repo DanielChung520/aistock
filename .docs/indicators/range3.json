@@ -1,0 +1,62 @@
+{
+  "metric": "range3",
+  "name": "三日振幅",
+  "category": "pattern",
+  "definition": "最近三根 K 線的最高價與最低價的差距百分比，衡量「窄幅整理」程度。數值越小代表三日盤整越狹窄，是型態突破（如三盤突破）的前置條件。",
+  "formula": "range3 = (max(high[-3:]) - min(low[-3:])) / close * 100；即以最近三根的最高點減最低點，除以最新收盤價，轉成百分比",
+  "parameters": [
+    {
+      "name": "lookback",
+      "default": 3,
+      "range": [
+        2,
+        10
+      ],
+      "tw_convention": "三盤突破慣用 3 日"
+    }
+  ],
+  "inputs": [
+    "high",
+    "low",
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      100
+    ],
+    "meaning": "數值越小，三日整理越窄。一般 < 3% 視為窄幅整理"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_range3",
+    "catalog_metric": "range3"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "窄幅整理",
+      "condition": "range3 < 3（%）"
+    },
+    {
+      "pattern": "三盤突破（前置）",
+      "condition": "range3 小 + 今日收盤突破前三天高點"
+    }
+  ],
+  "combines_with": [
+    "breakout_high3",
+    "vol_ratio",
+    "ma_bull"
+  ],
+  "notes": "來源：台股型態學（三盤突破）。尚未實作於 compute_snapshot，需新增。可參考 indicator001.md 的突破前高概念。",
+  "tags": [
+    "型態",
+    "窄幅整理",
+    "三盤突破（前置）",
+    "breakout_high3",
+    "vol_ratio",
+    "ma_bull"
+  ],
+  "llm_intent": "辨識價格型態與突破訊號，作為進出場的結構性依據（三日振幅）"
+}

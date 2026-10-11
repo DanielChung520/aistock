@@ -1,0 +1,62 @@
+{
+  "metric": "hma",
+  "name": "HMA 赫爾移動平均",
+  "category": "trend",
+  "definition": "結合兩條不同週期 WMA 的差值與開根號週期的 WMA，在平滑與低延遲之間取得平衡，趨勢轉折反應快。",
+  "formula": "HMA = WMA(2 × WMA(n/2) - WMA(n), √n)（Hull 演算法：先算差值再取開根號週期的 WMA）",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 16,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股短線常用 16（原發明者建議）或 9"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      "-∞",
+      "∞"
+    ],
+    "meaning": "低延遲均價：斜率方向代表趨勢方向"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_hma",
+    "catalog_metric": "hma"
+  },
+  "depends_on": [
+    "wma"
+  ],
+  "signals": [
+    {
+      "pattern": "斜率反轉",
+      "condition": "HMA 由下轉上（趨勢轉折的早期訊號）"
+    },
+    {
+      "pattern": "站上 HMA",
+      "condition": "價格站上 HMA 且 HMA 走升（多頭延續）"
+    }
+  ],
+  "combines_with": [
+    "wma",
+    "ema",
+    "macd"
+  ],
+  "notes": "來源：TA-Lib HMA（Hull Moving Average，Alan Hull 2005）。尚未實作於 compute_snapshot。台股慣例：HMA 低延遲特性適合短線當沖與波段轉折偵測，配合量能確認更佳。",
+  "tags": [
+    "趨勢",
+    "斜率反轉",
+    "站上 HMA",
+    "wma",
+    "ema",
+    "macd"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（HMA 赫爾移動平均）"
+}

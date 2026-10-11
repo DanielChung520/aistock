@@ -1,0 +1,61 @@
+{
+  "metric": "midprice",
+  "name": "MIDPRICE 週期中點價",
+  "category": "trend",
+  "definition": "一段期間內最高高點與最低低點的平均值，代表該區間的中點位置，常用於判斷價格在區間內相對偏強或偏弱。",
+  "formula": "MIDPRICE = (HHV(high, n) + LLV(low, n)) / 2；即（期間最高高點 + 期間最低低點）/ 2",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 14,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 14"
+    }
+  ],
+  "inputs": [
+    "high",
+    "low"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      "-∞",
+      "∞"
+    ],
+    "meaning": "區間中點：價格在其上代表區間偏強、其下代表偏弱"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_midprice",
+    "catalog_metric": "midprice"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "區間偏強",
+      "condition": "價格站上 MIDPRICE（強勢方掌控區間）"
+    },
+    {
+      "pattern": "區間偏弱",
+      "condition": "價格跌破 MIDPRICE（弱勢方掌控區間）"
+    }
+  ],
+  "combines_with": [
+    "bb_middle",
+    "ema",
+    "atr"
+  ],
+  "notes": "來源：TA-Lib MIDPRICE（Midpoint over period）。尚未實作於 compute_snapshot。台股慣例：屬通道中線概念（類似 Donchian 通道中軌），常用於區間盤整操作的強弱判斷。",
+  "tags": [
+    "趨勢",
+    "區間偏強",
+    "區間偏弱",
+    "bb_middle",
+    "ema",
+    "atr"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（MIDPRICE 週期中點價）"
+}

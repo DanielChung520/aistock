@@ -1,0 +1,59 @@
+{
+  "metric": "slope21",
+  "name": "MA21 斜率(%)",
+  "category": "trend",
+  "definition": "21日均線相對於前一交易日的百分比變化率，衡量中期均線的方向與加速度，是 MA Daniel 指標買賣訊號的核心條件。",
+  "formula": "slope21 = (MA21[t] - MA21[t-1]) / MA21[t-1] × 100",
+  "parameters": [],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      null,
+      null
+    ],
+    "meaning": ">0 中期均線上揚，<0 中期均線下彎；斜率加速轉折常預示訊號"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_ma_daniel",
+    "catalog_metric": "slope21"
+  },
+  "depends_on": [
+    "ma21"
+  ],
+  "signals": [
+    {
+      "pattern": "均線上揚",
+      "condition": "slope21 > 0"
+    },
+    {
+      "pattern": "均線下彎",
+      "condition": "slope21 < 0"
+    },
+    {
+      "pattern": "動能轉強",
+      "condition": "slope21 較前日上升（斜率加速度為正）"
+    }
+  ],
+  "combines_with": [
+    "ma21",
+    "slope8",
+    "buy_signal",
+    "sell_signal"
+  ],
+  "notes": "來源：台股自定義（內建），由 calculate_ma_daniel 的 _slope_series 計算。MA Daniel 指標：slope21 轉為加速上升為買進條件之一；slope21 加速度由正轉負為賣出條件之一。",
+  "tags": [
+    "趨勢",
+    "均線上揚",
+    "均線下彎",
+    "動能轉強",
+    "ma21",
+    "slope8",
+    "buy_signal",
+    "sell_signal"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（MA21 斜率(%)）"
+}

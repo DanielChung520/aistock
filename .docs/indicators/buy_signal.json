@@ -1,0 +1,72 @@
+{
+  "metric": "buy_signal",
+  "name": "MA Daniel 買進訊號",
+  "category": "trend",
+  "definition": "MA Daniel 指標的買進訊號：連續兩日收盤突破前兩日高點（三根K棒向上），且 MA21 斜率加速上升、MA8 斜率大於 0.05%，且趨勢非空頭（非 C 級）；訊號後 1 根K棒冷卻期內不重複觸發。",
+  "formula": "buy = (close > high[t-1] AND close > high[t-2]) AND (slope21 - slope21[t-1] > 0) AND (slope8 > 0.05%) AND (trend ≠ C)；且距前次賣出訊號 > cooldown（1）根K棒",
+  "parameters": [
+    {
+      "name": "buy_slope_min",
+      "default": 0.05,
+      "range": [
+        0,
+        1
+      ],
+      "tw_convention": "MA Daniel 指標預設 0.05%"
+    },
+    {
+      "name": "cooldown",
+      "default": 1,
+      "range": [
+        0,
+        10
+      ],
+      "tw_convention": "買賣訊號互斥冷卻根數"
+    }
+  ],
+  "inputs": [
+    "close",
+    "high",
+    "low"
+  ],
+  "outputs": {
+    "type": "bool",
+    "range": null,
+    "meaning": "true = 出現買進訊號"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_ma_daniel",
+    "catalog_metric": "buy_signal"
+  },
+  "depends_on": [
+    "ma8",
+    "ma21",
+    "ma55",
+    "trend"
+  ],
+  "signals": [
+    {
+      "pattern": "買進訊號",
+      "condition": "buy_signal is_true"
+    }
+  ],
+  "combines_with": [
+    "sell_signal",
+    "ma_bull",
+    "vol_ratio",
+    "slope8",
+    "slope21"
+  ],
+  "notes": "來源：台股自定義（內建），源自 MA Daniel Pine 指標（.docs/indicator001.md）。布林（bool）型指標，條件運算子只能用 is_true。買進訊號在 trend=C（空頭）時被抑制；買進後 cooldown 根內賣出訊號被抑制（避免隔根反轉）。",
+  "tags": [
+    "趨勢",
+    "買進訊號",
+    "sell_signal",
+    "ma_bull",
+    "vol_ratio",
+    "slope8",
+    "slope21"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（MA Daniel 買進訊號）"
+}

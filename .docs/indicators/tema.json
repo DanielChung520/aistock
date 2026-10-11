@@ -1,0 +1,67 @@
+{
+  "metric": "tema",
+  "name": "TEMA 三重指數移動平均",
+  "category": "trend",
+  "definition": "由三層 EMA 線性組合而成，大幅消除單層 EMA 的落後性，趨勢方向變化時反應最快（比 EMA、DEMA 更靈敏）。",
+  "formula": "EMA1 = EMA(price)；EMA2 = EMA(EMA1)；EMA3 = EMA(EMA2)；TEMA = 3 × EMA1 - 3 × EMA2 + EMA3",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 30,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 10 或 20（短中期）"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      "-∞",
+      "∞"
+    ],
+    "meaning": "低延遲均價：價格在其上為多頭、其下為空頭"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_tema",
+    "catalog_metric": "tema"
+  },
+  "depends_on": [
+    "ema"
+  ],
+  "signals": [
+    {
+      "pattern": "黃金交叉",
+      "condition": "短週期 TEMA 上穿長週期 TEMA（轉多，反應快）"
+    },
+    {
+      "pattern": "死亡交叉",
+      "condition": "短週期 TEMA 下穿長週期 TEMA（轉空）"
+    },
+    {
+      "pattern": "站上/跌破",
+      "condition": "價格站上 TEMA 為多、跌破為空"
+    }
+  ],
+  "combines_with": [
+    "ema",
+    "dema",
+    "macd"
+  ],
+  "notes": "來源：TA-Lib TEMA（Triple Exponential Moving Average，Patrick Mulloy）。尚未實作於 compute_snapshot。台股慣例：延遲比 EMA/DEMA 更低，適合追求快速反應的短線策略，需注意假訊號較多。",
+  "tags": [
+    "趨勢",
+    "黃金交叉",
+    "死亡交叉",
+    "站上/跌破",
+    "ema",
+    "dema",
+    "macd"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（TEMA 三重指數移動平均）"
+}

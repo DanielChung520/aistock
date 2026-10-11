@@ -1,0 +1,54 @@
+{
+  "metric": "slope8",
+  "name": "MA8 斜率(%)",
+  "category": "trend",
+  "definition": "8日均線相對於前一交易日的百分比變化率，衡量短期均線的上升或下降速度，正值代表均線上揚、負值代表下彎。",
+  "formula": "slope8 = (MA8[t] - MA8[t-1]) / MA8[t-1] × 100",
+  "parameters": [],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      null,
+      null
+    ],
+    "meaning": ">0 短期均線上揚（偏多），<0 短期均線下彎（偏空）；數值越大坡度越陡"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_ma_daniel",
+    "catalog_metric": "slope8"
+  },
+  "depends_on": [
+    "ma8"
+  ],
+  "signals": [
+    {
+      "pattern": "均線上揚",
+      "condition": "slope8 > 0"
+    },
+    {
+      "pattern": "均線下彎",
+      "condition": "slope8 < 0"
+    }
+  ],
+  "combines_with": [
+    "ma8",
+    "slope21",
+    "buy_signal",
+    "sell_signal"
+  ],
+  "notes": "來源：台股自定義（內建），由 calculate_ma_daniel 的 _slope_series 計算（單日百分比斜率，值四捨五入至小數 4 位）。MA Daniel 指標以 slope8 > 0.05 作為買進訊號的動能條件、slope8 < 0.02 作為賣出訊號條件。",
+  "tags": [
+    "趨勢",
+    "均線上揚",
+    "均線下彎",
+    "ma8",
+    "slope21",
+    "buy_signal",
+    "sell_signal"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（MA8 斜率(%)）"
+}

@@ -1,0 +1,48 @@
+{
+  "metric": "ma_bull",
+  "name": "MA 多頭排列（MA8>MA21>MA55）",
+  "category": "trend",
+  "definition": "短期、中期、長期均線由上而下依序排列（MA8 > MA21 > MA55），代表多頭趨勢結構完整，是多頭行情的重要確認訊號。",
+  "formula": "ma_bull = (MA8 > MA21) AND (MA21 > MA55)",
+  "parameters": [],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "bool",
+    "range": null,
+    "meaning": "true = 多頭排列成立，false = 非多頭排列"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "compute_snapshot",
+    "catalog_metric": "ma_bull"
+  },
+  "depends_on": [
+    "ma8",
+    "ma21",
+    "ma55"
+  ],
+  "signals": [
+    {
+      "pattern": "多頭排列",
+      "condition": "ma_bull is_true"
+    }
+  ],
+  "combines_with": [
+    "trend",
+    "slope8",
+    "vol_ratio",
+    "buy_signal"
+  ],
+  "notes": "來源：台股自定義（內建），由 strategy.py compute_snapshot 以 MA8>MA21>MA55 直接計算（與 trend 的 MA8≥MA55≥MA89 判斷不同）。布林（bool）型指標，條件運算子只能用 is_true。",
+  "tags": [
+    "趨勢",
+    "多頭排列",
+    "trend",
+    "slope8",
+    "vol_ratio",
+    "buy_signal"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（MA 多頭排列（MA8>MA21>MA55））"
+}

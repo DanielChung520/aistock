@@ -1,0 +1,64 @@
+{
+  "metric": "natr",
+  "name": "NATR 正規化平均真實波幅",
+  "category": "volatility",
+  "definition": "將 ATR 除以收盤價轉成百分比，可跨股票、跨價位直接比較波動度（不受股價高低影響）。",
+  "formula": "NATR = ATR / C × 100（ATR 為 Wilder 平滑的真實波幅平均，TR = max(H - L, |H - Cprev|, |L - Cprev|)）",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 14,
+      "range": [
+        1,
+        100
+      ],
+      "tw_convention": "台股常用 14，與 ATR 同週期"
+    }
+  ],
+  "inputs": [
+    "high",
+    "low",
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      "∞"
+    ],
+    "meaning": "百分比表示波動度，一般 > 5% 波動大、< 2% 波動小"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_natr",
+    "catalog_metric": "natr"
+  },
+  "depends_on": [
+    "atr"
+  ],
+  "signals": [
+    {
+      "pattern": "高波動",
+      "condition": "NATR 高（如 > 5%），適合波動型策略"
+    },
+    {
+      "pattern": "低波動",
+      "condition": "NATR 低（如 < 2%），盤整觀望"
+    }
+  ],
+  "combines_with": [
+    "atr",
+    "bb_width",
+    "stddev"
+  ],
+  "notes": "來源：TA-Lib NATR。尚未實作於 compute_snapshot。台股慣例：NATR 以百分比呈現，可直接比較不同價位個股（如電子高價股 vs 金融股）的波動度。",
+  "tags": [
+    "波動",
+    "高波動",
+    "低波動",
+    "atr",
+    "bb_width",
+    "stddev"
+  ],
+  "llm_intent": "衡量價格波動幅度與風險，用於停損設定與波動率判斷（NATR 正規化平均真實波幅）"
+}

@@ -1,0 +1,66 @@
+{
+  "metric": "correl",
+  "name": "CORREL 相關係數",
+  "category": "statistical",
+  "definition": "計算兩組序列（如個股與大盤、兩檔個股）在 N 期內的皮爾森相關係數，衡量兩者同向變動的程度。用於比價分析與避險配對，數值介於 -1（完全反向）到 +1（完全同向）。",
+  "formula": "CORREL = Σ((x(i) - x̄)(y(i) - ȳ)) / sqrt(Σ(x(i) - x̄)² × Σ(y(i) - ȳ)²)；x、y 為兩組輸入序列（皮爾森相關係數）",
+  "parameters": [
+    {
+      "name": "timeperiod",
+      "default": 30,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 20（月線級）或 30（季線級）"
+    }
+  ],
+  "inputs": [
+    "close",
+    "close2"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      -1,
+      1
+    ],
+    "meaning": "接近 +1 高度同向（同漲同跌），接近 -1 高度反向，接近 0 無相關"
+  },
+  "implementation": {
+    "implemented": false,
+    "function": null,
+    "catalog_metric": null
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "高度相關",
+      "condition": "CORREL > 0.8（個股與大盤同向，比價有效）"
+    },
+    {
+      "pattern": "相關性瓦解",
+      "condition": "CORREL 由高檔快速下降（個股脫離大盤走勢，需重新檢視）"
+    },
+    {
+      "pattern": "負相關",
+      "condition": "CORREL < -0.5（配對避險候選）"
+    }
+  ],
+  "combines_with": [
+    "beta",
+    "price",
+    "pct_change"
+  ],
+  "notes": "來源：TA-Lib CORREL。需兩個輸入序列：close 為標的收盤價，close2 為比較基準（如大盤指數或另一檔股票收盤價），比價分析用；配對交易時可配合 beta 使用。尚未實作於 compute_snapshot，需新增。 [2026-08] 需大盤基準序列（stock_daily 無台指期/指數資料），未接入 INDICATOR_CATALOG，維持不可執行。",
+  "tags": [
+    "統計",
+    "高度相關",
+    "相關性瓦解",
+    "負相關",
+    "beta",
+    "price",
+    "pct_change"
+  ],
+  "llm_intent": "以統計方法計算價格的相對位置與分布，供均值回歸或偏離判斷（CORREL 相關係數）"
+}

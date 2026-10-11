@@ -1,0 +1,76 @@
+{
+  "metric": "vol_ratio",
+  "name": "量比（近5日均量/近20日均量）",
+  "category": "volume",
+  "definition": "近 5 日平均成交量與近 20 日平均成交量的比值，衡量近期量能相對放大或萎縮，是判斷漲跌是否「量價配合」的核心指標。",
+  "formula": "vol_ratio = AVG(volume, 5) / AVG(volume, 20)",
+  "parameters": [
+    {
+      "name": "short",
+      "default": 5,
+      "range": [
+        1,
+        60
+      ],
+      "tw_convention": "台股量比慣用 5 日短均"
+    },
+    {
+      "name": "long",
+      "default": 20,
+      "range": [
+        5,
+        120
+      ],
+      "tw_convention": "台股量比慣用 20 日長均"
+    }
+  ],
+  "inputs": [
+    "volume"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      null
+    ],
+    "meaning": ">1 近期放量，<1 近期量縮；>1.5 屬明顯放量，<0.8 屬明顯量縮"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "compute_snapshot",
+    "catalog_metric": "vol_ratio"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "放量",
+      "condition": "vol_ratio > 1.5"
+    },
+    {
+      "pattern": "量縮",
+      "condition": "vol_ratio < 0.8"
+    },
+    {
+      "pattern": "放量上攻",
+      "condition": "vol_ratio > 1.5 AND pct_change > 0"
+    }
+  ],
+  "combines_with": [
+    "price",
+    "pct_change",
+    "buy_signal",
+    "bb_width"
+  ],
+  "notes": "來源：台股自定義（內建），由 strategy.py compute_snapshot 以 5 日均量 / 20 日均量計算。注意：與一般「量比＝今日量/過去5日均量」定義不同，本實作為 5日/20日平均量比，請勿混用。",
+  "tags": [
+    "量能",
+    "放量",
+    "量縮",
+    "放量上攻",
+    "price",
+    "pct_change",
+    "buy_signal",
+    "bb_width"
+  ],
+  "llm_intent": "分析成交量能變化，驗證價格走勢的可靠性與量價關係（量比（近5日均量/近20日均量））"
+}

@@ -1,0 +1,54 @@
+{
+  "metric": "price",
+  "name": "最新收盤價",
+  "category": "trend",
+  "definition": "股票最新一根K棒的收盤價，是所有技術指標計算的基準價，也是判斷趨勢與支撐壓力的最基本價格。",
+  "formula": "price = close[t]（最新一根K棒的收盤價）",
+  "parameters": [],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      null
+    ],
+    "meaning": "最新收盤價，單位為新台幣元"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "compute_snapshot",
+    "catalog_metric": "price"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "站上均線",
+      "condition": "price > ma21（收盤站上21日均線）"
+    },
+    {
+      "pattern": "跌破均線",
+      "condition": "price < ma21（收盤跌破21日均線）"
+    }
+  ],
+  "combines_with": [
+    "ma8",
+    "ma21",
+    "ma55",
+    "close_offset",
+    "vol_ratio"
+  ],
+  "notes": "來源：strategy.py compute_snapshot（內建）。台股慣例：紅漲綠跌；常與均線、扣抵值（close_offset）搭配判斷未來均線走向與支撐壓力。",
+  "tags": [
+    "趨勢",
+    "站上均線",
+    "跌破均線",
+    "ma8",
+    "ma21",
+    "ma55",
+    "close_offset",
+    "vol_ratio"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（最新收盤價）"
+}

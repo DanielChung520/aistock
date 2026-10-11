@@ -1,0 +1,77 @@
+{
+  "metric": "sar",
+  "name": "SAR 拋物線轉向",
+  "category": "trend",
+  "definition": "以拋物線軌跡跟隨趨勢的停損點指標，SAR 點位在價格下方代表多頭趨勢（可當移動停損），價格穿越即趨勢反轉。",
+  "formula": "多頭：SAR(t) = SAR(t-1) + AF × (EP - SAR(t-1))，EP 為期間最高價；空頭對稱使用期間最低價。AF（加速因子）起始 0.02，每次創新高/新低 +0.02，上限 0.2；價格穿越 SAR 即翻轉方向",
+  "parameters": [
+    {
+      "name": "acceleration",
+      "default": 0.02,
+      "range": [
+        0.001,
+        0.2
+      ],
+      "tw_convention": "台股慣用 0.02（TA-Lib step 預設）"
+    },
+    {
+      "name": "maximum",
+      "default": 0.2,
+      "range": [
+        0.01,
+        0.5
+      ],
+      "tw_convention": "台股慣用 0.2（TA-Lib max 預設）"
+    }
+  ],
+  "inputs": [
+    "high",
+    "low"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      "-∞",
+      "∞"
+    ],
+    "meaning": "SAR 點在價格下方為多頭（支撐/停損），上方為空頭（壓力）"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_sar",
+    "catalog_metric": "sar"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "空翻多",
+      "condition": "價格由下方向上穿越 SAR（趨勢反轉為多）"
+    },
+    {
+      "pattern": "多翻空",
+      "condition": "價格由上方向下穿越 SAR（趨勢反轉為空）"
+    },
+    {
+      "pattern": "多頭延續",
+      "condition": "SAR 持續在價格下方且逐日上移（上升趨勢）"
+    }
+  ],
+  "combines_with": [
+    "atr",
+    "adx",
+    "ema",
+    "supertrend"
+  ],
+  "notes": "來源：TA-Lib SAR（Parabolic SAR，Welles Wilder）。尚未實作於 compute_snapshot。台股慣例：加速因子 0.02、上限 0.2 為通用設定；常作為移動停損使用（如收盤跌破 SAR 出場），與 ATR 停損搭配確認。",
+  "tags": [
+    "趨勢",
+    "空翻多",
+    "多翻空",
+    "多頭延續",
+    "atr",
+    "adx",
+    "ema",
+    "supertrend"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（SAR 拋物線轉向）"
+}

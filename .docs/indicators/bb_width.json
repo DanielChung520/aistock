@@ -1,0 +1,56 @@
+{
+  "metric": "bb_width",
+  "name": "布林帶寬(%)",
+  "category": "volatility",
+  "definition": "布林通道帶寬 = (上軌 - 下軌) / 中軌 × 100，衡量波動幅度的大小；帶寬收縮（擠壓）代表波動率降低，常為突破行情的前兆。",
+  "formula": "bb_width = (bb_upper - bb_lower) / bb_middle × 100",
+  "parameters": [],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      null
+    ],
+    "meaning": "帶寬百分比；數值越小波動越窄（擠壓），越大波動越劇烈"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "compute_snapshot",
+    "catalog_metric": "bb_width"
+  },
+  "depends_on": [
+    "bb_upper",
+    "bb_middle",
+    "bb_lower"
+  ],
+  "signals": [
+    {
+      "pattern": "帶寬收縮",
+      "condition": "bb_width 創近期新低（擠壓，突破前兆）"
+    },
+    {
+      "pattern": "帶寬擴張",
+      "condition": "bb_width 快速擴大（趨勢發動）"
+    }
+  ],
+  "combines_with": [
+    "bb_upper",
+    "bb_middle",
+    "bb_lower",
+    "vol_ratio"
+  ],
+  "notes": "來源：台股自定義（內建），由 strategy.py compute_snapshot 以 (upper - lower) / middle × 100 計算。台股慣例：帶寬收縮後搭配放量（vol_ratio > 1.5）突破，勝率較高。",
+  "tags": [
+    "波動",
+    "帶寬收縮",
+    "帶寬擴張",
+    "bb_upper",
+    "bb_middle",
+    "bb_lower",
+    "vol_ratio"
+  ],
+  "llm_intent": "衡量價格波動幅度與風險，用於停損設定與波動率判斷（布林帶寬(%)）"
+}

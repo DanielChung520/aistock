@@ -1,0 +1,85 @@
+{
+  "metric": "ultosc",
+  "name": "ULTOSC 終極擺盪指標",
+  "category": "momentum",
+  "definition": "以三個週期（7/14/28）的買賣壓加權合成單一擺盪值，兼顧短中長期動能，降低單一週期的假訊號。數值介於 0~100，>70 超買、<30 超賣。",
+  "formula": "ULTOSC = 100 × (4 × BP7 + 2 × BP14 + BP28) / (4 × TR7 + 2 × TR14 + TR28)；BP（買賣壓）= C - min(L, C_prev)；TR（真實區間）= max(H, C_prev) - min(L, C_prev)；下標為各週期之加總",
+  "parameters": [
+    {
+      "name": "timeperiod1",
+      "default": 7,
+      "range": [
+        1,
+        100
+      ],
+      "tw_convention": "台股慣用 7"
+    },
+    {
+      "name": "timeperiod2",
+      "default": 14,
+      "range": [
+        1,
+        100
+      ],
+      "tw_convention": "台股慣用 14"
+    },
+    {
+      "name": "timeperiod3",
+      "default": 28,
+      "range": [
+        1,
+        100
+      ],
+      "tw_convention": "台股慣用 28"
+    }
+  ],
+  "inputs": [
+    "high",
+    "low",
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      100
+    ],
+    "meaning": ">70 超買（可能回檔），<30 超賣（可能反彈）"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_ultosc",
+    "catalog_metric": "ultosc"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "超買",
+      "condition": "ULTOSC > 70"
+    },
+    {
+      "pattern": "超賣",
+      "condition": "ULTOSC < 30"
+    },
+    {
+      "pattern": "背離",
+      "condition": "股價創高而 ULTOSC 未創高（頂背離，看跌）"
+    }
+  ],
+  "combines_with": [
+    "rsi",
+    "kdj",
+    "willr"
+  ],
+  "notes": "來源：TA-Lib ULTOSC。台股慣例：三週期加權（7/14/28）使其比單一週期擺盪指標更平滑，適合波段操作；超買超賣門檻與 RSI 相近（70/30）。尚未實作於 compute_snapshot，需新增。",
+  "tags": [
+    "動能",
+    "超買",
+    "超賣",
+    "背離",
+    "rsi",
+    "kdj",
+    "willr"
+  ],
+  "llm_intent": "衡量價格變動的動能與速度，用於尋找超買超賣或動能持續性（ULTOSC 終極擺盪指標）"
+}

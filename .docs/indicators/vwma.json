@@ -1,0 +1,61 @@
+{
+  "metric": "vwma",
+  "name": "VWMA 成交量加權移動平均",
+  "category": "trend",
+  "definition": "以成交量為權重的移動平均，大量成交日的價格權重較高，反映市場實際成交的成本重心。",
+  "formula": "VWMA = Σ(close_i × volume_i, n) / Σ(volume_i, n)",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 30,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 20（對應月線）"
+    }
+  ],
+  "inputs": [
+    "close",
+    "volume"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      "-∞",
+      "∞"
+    ],
+    "meaning": "成交量加權成本均價：價格在其上代表多數成本在下方（支撐）"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_vwma",
+    "catalog_metric": "vwma"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "站上 VWMA",
+      "condition": "價格站上 VWMA（大量成交成本在下方形成支撐）"
+    },
+    {
+      "pattern": "跌破 VWMA",
+      "condition": "價格跌破 VWMA（成本重心轉上，轉弱）"
+    }
+  ],
+  "combines_with": [
+    "vwap",
+    "obv",
+    "vol_ratio"
+  ],
+  "notes": "來源：TA-Lib VWMA（Volume Weighted Moving Average）。尚未實作於 compute_snapshot。台股慣例：VWMA(20) 對應月線；權值股成交量集中，VWMA 接近實際成本分佈，常用於判斷支撐壓力。",
+  "tags": [
+    "趨勢",
+    "站上 VWMA",
+    "跌破 VWMA",
+    "vwap",
+    "obv",
+    "vol_ratio"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（VWMA 成交量加權移動平均）"
+}

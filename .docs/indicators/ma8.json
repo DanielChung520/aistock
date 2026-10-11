@@ -1,0 +1,72 @@
+{
+  "metric": "ma8",
+  "name": "8日均線（MA8）",
+  "category": "trend",
+  "definition": "過去 8 個交易日收盤價的簡單移動平均（SMA），為短期趨勢指標，反映近兩週的價格平均水準與短期方向。",
+  "formula": "MA8 = (C[t-7] + C[t-6] + ... + C[t]) / 8",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 8,
+      "range": [
+        1,
+        250
+      ],
+      "tw_convention": "台股常用費氏級數 5/8/13/21"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      null
+    ],
+    "meaning": "8日平均價位；收盤價在 MA8 之上代表短期偏多"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_ma_daniel",
+    "catalog_metric": "ma8"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "短多",
+      "condition": "price > ma8"
+    },
+    {
+      "pattern": "短空",
+      "condition": "price < ma8"
+    },
+    {
+      "pattern": "黃金交叉",
+      "condition": "ma8 上穿 ma21（cross_above）"
+    },
+    {
+      "pattern": "死亡交叉",
+      "condition": "ma8 下穿 ma21（cross_below）"
+    }
+  ],
+  "combines_with": [
+    "ma21",
+    "ma55",
+    "slope8",
+    "buy_signal",
+    "sell_signal"
+  ],
+  "notes": "來源：TA-Lib SMA（calculate_ma_daniel 以 SMA 實作，ma_type='sma'，值四捨五入至小數 2 位）。台股慣例：MA8 為短線多空分界，與 MA21 金叉/死叉為常用交易訊號。",
+  "tags": [
+    "趨勢",
+    "短多",
+    "短空",
+    "黃金交叉",
+    "死亡交叉",
+    "ma21",
+    "ma55",
+    "slope8"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（8日均線（MA8））"
+}

@@ -1,0 +1,69 @@
+{
+  "metric": "ma21",
+  "name": "21日均線（MA21）",
+  "category": "trend",
+  "definition": "過去 21 個交易日收盤價的簡單移動平均（SMA），為中期趨勢指標，約當一個月的交易週期，是台股短中線操作的重要參考線。",
+  "formula": "MA21 = (C[t-20] + C[t-19] + ... + C[t]) / 21",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 21,
+      "range": [
+        1,
+        250
+      ],
+      "tw_convention": "台股慣用 21（月線近似）"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      null
+    ],
+    "meaning": "21日平均價位；收盤價在 MA21 之上代表中期偏多"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_ma_daniel",
+    "catalog_metric": "ma21"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "中多",
+      "condition": "price > ma21"
+    },
+    {
+      "pattern": "中空",
+      "condition": "price < ma21"
+    },
+    {
+      "pattern": "多頭排列",
+      "condition": "ma8 > ma21 > ma55（ma_bull）"
+    }
+  ],
+  "combines_with": [
+    "ma8",
+    "ma55",
+    "slope21",
+    "ma_bull",
+    "buy_signal",
+    "sell_signal"
+  ],
+  "notes": "來源：TA-Lib SMA（calculate_ma_daniel）。台股慣例：21日線常被視為月線（約一個月交易日數），跌破 21 日線常被視為波段轉弱訊號。",
+  "tags": [
+    "趨勢",
+    "中多",
+    "中空",
+    "多頭排列",
+    "ma8",
+    "ma55",
+    "slope21",
+    "ma_bull"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（21日均線（MA21））"
+}

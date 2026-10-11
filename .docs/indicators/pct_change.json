@@ -1,0 +1,57 @@
+{
+  "metric": "pct_change",
+  "name": "最新漲跌幅(%)",
+  "category": "trend",
+  "definition": "最新收盤價相對前一交易日收盤價的漲跌百分比，衡量單日漲跌幅度，是趨勢動能的基本度量。",
+  "formula": "pct_change = (close[t] - close[t-1]) / close[t-1] × 100",
+  "parameters": [],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      null,
+      null
+    ],
+    "meaning": "正值代表上漲、負值代表下跌；一般股漲跌幅限制 ±10%、上櫃與興櫃部分 ±20%"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "compute_snapshot",
+    "catalog_metric": "pct_change"
+  },
+  "depends_on": [
+    "price"
+  ],
+  "signals": [
+    {
+      "pattern": "強勢上漲",
+      "condition": "pct_change > 5"
+    },
+    {
+      "pattern": "漲停",
+      "condition": "pct_change >= 10（一般股）"
+    },
+    {
+      "pattern": "大跌",
+      "condition": "pct_change < -5"
+    }
+  ],
+  "combines_with": [
+    "price",
+    "vol_ratio",
+    "trend"
+  ],
+  "notes": "來源：strategy.py compute_snapshot（內建）。台股慣例：搭配量比（vol_ratio）判斷漲跌是否放量（量價配合），如漲幅大且量比>1.5 屬放量上攻。",
+  "tags": [
+    "趨勢",
+    "強勢上漲",
+    "漲停",
+    "大跌",
+    "price",
+    "vol_ratio",
+    "trend"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（最新漲跌幅(%)）"
+}

@@ -1,0 +1,59 @@
+{
+  "metric": "linearreg",
+  "name": "線性回歸值",
+  "category": "statistical",
+  "definition": "以最小平方法對最近 N 期收盤價配適一條直線，取直線在當前期數上的估計值。可視為去除雜訊的趨勢線，其與實際收盤價的偏離可衡量超買超賣。",
+  "formula": "y = a + b × x；b（斜率）= (n × Σ(i × C(i)) - Σi × ΣC(i)) / (n × Σi² - (Σi)²)；a（截距）= C̄ - b × ī；LINEARREG = a + b × n（x 取當前期數 n，即回歸直線目前位置）",
+  "parameters": [
+    {
+      "name": "timeperiod",
+      "default": 14,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 14 或 20，短線可用 8"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": null,
+    "meaning": "回歸線估計值（價格單位），可與實際收盤價比較偏離程度"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_linearreg",
+    "catalog_metric": "linearreg"
+  },
+  "depends_on": [
+    "linearreg_slope"
+  ],
+  "signals": [
+    {
+      "pattern": "偏離回歸線",
+      "condition": "收盤價遠高於 LINEARREG（超買，可能回歸）"
+    },
+    {
+      "pattern": "跌破回歸線",
+      "condition": "收盤價跌破 LINEARREG 且斜率向下（轉弱）"
+    }
+  ],
+  "combines_with": [
+    "linearreg_slope",
+    "tsf",
+    "stddev"
+  ],
+  "notes": "來源：TA-Lib LINEARREG。台股慣例：收盤價與 LINEARREG 的偏離（回歸通道）可視為常態區間，極端偏離後常有回歸（mean reversion）行情；斜率與回歸值常並用。尚未實作於 compute_snapshot，需新增。",
+  "tags": [
+    "統計",
+    "偏離回歸線",
+    "跌破回歸線",
+    "linearreg_slope",
+    "tsf",
+    "stddev"
+  ],
+  "llm_intent": "以統計方法計算價格的相對位置與分布，供均值回歸或偏離判斷（線性回歸值）"
+}

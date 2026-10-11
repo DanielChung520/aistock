@@ -1,0 +1,58 @@
+{
+  "metric": "beta",
+  "name": "BETA Beta 係數",
+  "category": "statistical",
+  "definition": "衡量標的（個股）報酬對基準（如大盤）報酬的敏感度，為兩序列的共變異數除以基準的變異數。Beta > 1 代表波動放大於大盤（攻擊型），< 1 代表相對抗跌（防禦型），常搭配相關係數用於比價與風險評估。",
+  "formula": "BETA = Cov(x, y) / Var(y)；x 為標的報酬序列，y 為基準報酬序列（如大盤）；即 β = Σ((x(i) - x̄)(y(i) - ȳ)) / Σ((y(i) - ȳ)²)",
+  "parameters": [
+    {
+      "name": "timeperiod",
+      "default": 5,
+      "range": [
+        1,
+        100
+      ],
+      "tw_convention": "台股常用 5（短線）或 20（月線級）；期間越長越平滑"
+    }
+  ],
+  "inputs": [
+    "close",
+    "close2"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": null,
+    "meaning": ">1 波動大於基準（大盤漲 1% 個股漲超過 1%）；<1 波動小於基準；負值代表反向"
+  },
+  "implementation": {
+    "implemented": false,
+    "function": null,
+    "catalog_metric": null
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "攻擊型",
+      "condition": "BETA > 1（多頭市場較有利）"
+    },
+    {
+      "pattern": "防禦型",
+      "condition": "BETA < 1（空頭市場較抗跌）"
+    }
+  ],
+  "combines_with": [
+    "correl",
+    "price",
+    "pct_change"
+  ],
+  "notes": "來源：TA-Lib BETA。需兩個輸入序列：close 為標的收盤價，close2 為基準收盤價（如大盤指數 加權指數），比價與風險評估用；台股慣例以加權指數為基準。尚未實作於 compute_snapshot，需新增。 [2026-08] 需大盤基準序列（stock_daily 無台指期/指數資料），未接入 INDICATOR_CATALOG，維持不可執行。",
+  "tags": [
+    "統計",
+    "攻擊型",
+    "防禦型",
+    "correl",
+    "price",
+    "pct_change"
+  ],
+  "llm_intent": "以統計方法計算價格的相對位置與分布，供均值回歸或偏離判斷（BETA Beta 係數）"
+}

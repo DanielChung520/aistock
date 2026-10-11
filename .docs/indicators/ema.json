@@ -1,0 +1,67 @@
+{
+  "metric": "ema",
+  "name": "EMA 指數移動平均",
+  "category": "trend",
+  "definition": "對近期價格賦予指數遞減權重的移動平均，比 SMA 更靈敏地反映價格變化，是 MACD、TEMA 等眾多指標的基礎。",
+  "formula": "EMA(t) = C(t) × k + EMA(t-1) × (1 - k)；k = 2 / (period + 1)（平滑係數）",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 12,
+      "range": [
+        2,
+        200
+      ],
+      "tw_convention": "台股常用 12/26（MACD 基礎）、短線 5/10/20"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      "-∞",
+      "∞"
+    ],
+    "meaning": "均價位置：價格在其上為多頭、其下為空頭"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_ema",
+    "catalog_metric": "ema"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "黃金交叉",
+      "condition": "短週期 EMA 上穿長週期 EMA（轉多）"
+    },
+    {
+      "pattern": "死亡交叉",
+      "condition": "短週期 EMA 下穿長週期 EMA（轉空）"
+    },
+    {
+      "pattern": "站上/跌破",
+      "condition": "價格站上 EMA 為支撐、跌破 EMA 轉弱"
+    }
+  ],
+  "combines_with": [
+    "ma_bull",
+    "macd",
+    "tema",
+    "dema"
+  ],
+  "notes": "來源：TA-Lib EMA。尚未實作於 compute_snapshot。台股慣例：EMA 較 SMA 靈敏，12/26 為 MACD 基礎參數；20（月線）常用於波段趨勢判斷。",
+  "tags": [
+    "趨勢",
+    "黃金交叉",
+    "死亡交叉",
+    "站上/跌破",
+    "ma_bull",
+    "macd",
+    "tema",
+    "dema"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（EMA 指數移動平均）"
+}

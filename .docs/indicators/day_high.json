@@ -1,0 +1,45 @@
+{
+  "metric": "day_high",
+  "name": "單日最高價",
+  "category": "pattern",
+  "definition": "當日 K 線的最高價，是突破比較的基礎價位，可作為短線壓力與突破基準。",
+  "formula": "day_high = 當日 high",
+  "parameters": [],
+  "inputs": [
+    "high"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      100000
+    ],
+    "meaning": "當日最高股價（元），值越大代表當日多方力道越強"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_day_high",
+    "catalog_metric": "day_high"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "當日壓力位",
+      "condition": "當日高點為短線壓力，收盤越過後轉為支撐"
+    }
+  ],
+  "combines_with": [
+    "breakout_high3",
+    "max_n",
+    "new_high_n"
+  ],
+  "notes": "來源：台股型態學。尚未實作於 compute_snapshot，需新增。為突破比較的基礎輸入，常與高價相關指標（max_n / breakout_high3 / new_high_n）搭配使用。",
+  "tags": [
+    "型態",
+    "當日壓力位",
+    "breakout_high3",
+    "max_n",
+    "new_high_n"
+  ],
+  "llm_intent": "辨識價格型態與突破訊號，作為進出場的結構性依據（單日最高價）"
+}

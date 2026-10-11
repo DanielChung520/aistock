@@ -1,0 +1,62 @@
+{
+  "metric": "roc",
+  "name": "ROC 變動率指標",
+  "category": "momentum",
+  "definition": "計算今日收盤價相對 N 日前收盤價的漲跌百分比，衡量動能強弱且可跨股比較。穿越 0 軸為多空轉折訊號，高檔鈍化代表動能過熱。",
+  "formula": "ROC = (C - C[n]) / C[n] × 100；即 (今日收盤價 - N 日前收盤價) / N 日前收盤價 × 100%",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 10,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 12（月線級）或 20，短線可用 5"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": null,
+    "meaning": ">0 上漲動能（百分比），<0 下跌動能；正值越大動能越強"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_roc",
+    "catalog_metric": "roc"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "多頭動能",
+      "condition": "ROC > 0"
+    },
+    {
+      "pattern": "空頭動能",
+      "condition": "ROC < 0"
+    },
+    {
+      "pattern": "動能反轉",
+      "condition": "ROC 由下往上穿越 0 軸（買進訊號）"
+    }
+  ],
+  "combines_with": [
+    "mom",
+    "rsi",
+    "macd"
+  ],
+  "notes": "來源：TA-Lib ROC。台股慣例：ROC 為百分比形式，可在不同價位股票間橫向比較動能；搭配量比確認動能是否伴隨量能。尚未實作於 compute_snapshot，需新增。",
+  "tags": [
+    "動能",
+    "多頭動能",
+    "空頭動能",
+    "動能反轉",
+    "mom",
+    "rsi",
+    "macd"
+  ],
+  "llm_intent": "衡量價格變動的動能與速度，用於尋找超買超賣或動能持續性（ROC 變動率指標）"
+}

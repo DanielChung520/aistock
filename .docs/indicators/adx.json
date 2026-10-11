@@ -1,0 +1,71 @@
+{
+  "metric": "adx",
+  "name": "ADX 平均趨向指標",
+  "category": "momentum",
+  "definition": "衡量趨勢強度的指標，數值越大趨勢越強（不論多空）。本身不指示方向，需搭配 +DI / -DI 判斷多空；常用於過濾盤整、只在趨勢明確時進場。",
+  "formula": "ADX = DX 的 Wilder 平滑（n 期）；DX = 100 × |+DI - -DI| / (+DI + -DI)；+DI = 100 × 平滑後的 +DM / ATR 相關值；-DI = 100 × 平滑後的 -DM / ATR 相關值；+DM = 今日高 - 昨日高（若大於今日低 - 昨日低），-DM = 今日低 - 昨日低（對稱）",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 14,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 14，短線可縮至 7"
+    }
+  ],
+  "inputs": [
+    "high",
+    "low",
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      100
+    ],
+    "meaning": ">25 趨勢強，<20 盤整無趨勢，20~25 趨勢醞釀中"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_adx",
+    "catalog_metric": "adx"
+  },
+  "depends_on": [
+    "dx"
+  ],
+  "signals": [
+    {
+      "pattern": "強趨勢",
+      "condition": "ADX > 25 且 +DI > -DI（多頭）"
+    },
+    {
+      "pattern": "無趨勢",
+      "condition": "ADX < 20（盤整，不宜追價）"
+    },
+    {
+      "pattern": "趨勢轉強",
+      "condition": "ADX 由 20 下方上穿 20"
+    }
+  ],
+  "combines_with": [
+    "dx",
+    "macd",
+    "ma_bull",
+    "atr"
+  ],
+  "notes": "來源：TA-Lib ADX。台股慣例：ADX > 25 視為趨勢確立，搭配 +DI/-DI 交叉確認方向；盤整期 ADX 過濾假突破效果佳。尚未實作於 compute_snapshot，需新增。",
+  "tags": [
+    "動能",
+    "強趨勢",
+    "無趨勢",
+    "趨勢轉強",
+    "dx",
+    "macd",
+    "ma_bull",
+    "atr"
+  ],
+  "llm_intent": "衡量價格變動的動能與速度，用於尋找超買超賣或動能持續性（ADX 平均趨向指標）"
+}

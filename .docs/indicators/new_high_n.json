@@ -1,0 +1,61 @@
+{
+  "metric": "new_high_n",
+  "name": "創 N 日新高",
+  "category": "pattern",
+  "definition": "今日價格創下最近 N 日（含今日）的新高，代表多方突破前段整理區間，屬多頭確認訊號。",
+  "formula": "new_high_n = close == max(close, N) 或 high == max(high, N)；即今日收盤價（或最高價）等於最近 N 日的最高價，輸出布林值",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 20,
+      "range": [
+        5,
+        250
+      ],
+      "tw_convention": "台股常用 20 日（月新高）/ 60 日（季新高）/ 250 日（年新高）"
+    }
+  ],
+  "inputs": [
+    "high",
+    "close"
+  ],
+  "outputs": {
+    "type": "bool",
+    "range": [
+      0,
+      1
+    ],
+    "meaning": "true = 創 N 日新高；false = 未創新高"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_new_high_n",
+    "catalog_metric": "new_high_n"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "突破",
+      "condition": "close == max(close, N)（收盤創 N 日新高）"
+    },
+    {
+      "pattern": "創新高（多頭訊號）",
+      "condition": "high == max(high, N)（盤中創 N 日新高），配合量能放大更佳"
+    }
+  ],
+  "combines_with": [
+    "vol_ratio",
+    "ma_bull",
+    "range3"
+  ],
+  "notes": "來源：台股型態學。尚未實作於 compute_snapshot，需新增。創新高常配合量能確認（vol_ratio > 1 代表放量），突破 20/60 日新高分別代表月線級別與季線級別的趨勢突破。",
+  "tags": [
+    "型態",
+    "突破",
+    "創新高（多頭訊號）",
+    "vol_ratio",
+    "ma_bull",
+    "range3"
+  ],
+  "llm_intent": "辨識價格型態與突破訊號，作為進出場的結構性依據（創 N 日新高）"
+}

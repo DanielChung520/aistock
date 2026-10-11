@@ -1,0 +1,83 @@
+{
+  "metric": "kama",
+  "name": "KAMA 考夫曼自適應移動平均",
+  "category": "trend",
+  "definition": "依市場效率比值（ER）動態調整平滑係數的移動平均：趨勢明確時貼近價格（靈敏）、盤整時趨於平緩（減少假訊號）。",
+  "formula": "ER（效率比值）= |C(t) - C(t - period)| / Σ|C(i) - C(i-1)|；SC（平滑常數）= (ER × (2/(fast+1) - 2/(slow+1)) + 2/(slow+1))²；KAMA(t) = KAMA(t-1) + SC × (C(t) - KAMA(t-1))",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 10,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股慣用 TA-Lib 預設 10（效率比值期數）"
+    },
+    {
+      "name": "fast",
+      "default": 2,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股慣用 2（快速平滑期數）"
+    },
+    {
+      "name": "slow",
+      "default": 30,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股慣用 30（慢速平滑期數）"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      "-∞",
+      "∞"
+    ],
+    "meaning": "自適應均價：趨勢強時貼近價格、盤整時平滑"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_kama",
+    "catalog_metric": "kama"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "上穿 KAMA",
+      "condition": "價格上穿 KAMA（趨勢轉多）"
+    },
+    {
+      "pattern": "下穿 KAMA",
+      "condition": "價格下穿 KAMA（趨勢轉空）"
+    },
+    {
+      "pattern": "KAMA 走平",
+      "condition": "KAMA 斜率接近 0（盤整，觀望）"
+    }
+  ],
+  "combines_with": [
+    "adx",
+    "ema",
+    "sar"
+  ],
+  "notes": "來源：TA-Lib KAMA（Kaufman Adaptive Moving Average，Perry Kaufman）。尚未實作於 compute_snapshot。台股慣例：10/2/30 為預設參數；配合 ADX 判斷趨勢強度使用效果最佳。",
+  "tags": [
+    "趨勢",
+    "上穿 KAMA",
+    "下穿 KAMA",
+    "KAMA 走平",
+    "adx",
+    "ema",
+    "sar"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（KAMA 考夫曼自適應移動平均）"
+}

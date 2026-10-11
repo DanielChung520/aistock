@@ -1,0 +1,64 @@
+{
+  "metric": "linearreg_slope",
+  "name": "線性回歸斜率",
+  "category": "statistical",
+  "definition": "對最近 N 期收盤價做最小平方法線性回歸，取其斜率作為趨勢方向與速度的度量。斜率為正代表上升趨勢、為負代表下降趨勢，數值大小反映趨勢強度。",
+  "formula": "slope = (n × Σ(i × C(i)) - Σi × ΣC(i)) / (n × Σi² - (Σi)²)；以時間 i = 1..n 為自變數、收盤價 C(i) 為應變數做最小平方法迴歸的斜率",
+  "parameters": [
+    {
+      "name": "timeperiod",
+      "default": 14,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 14 或 20，短線可用 8"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": null,
+    "meaning": ">0 上升趨勢，<0 下降趨勢；數值單位為價格/期"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_linearreg_slope",
+    "catalog_metric": "linearreg_slope"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "上升趨勢",
+      "condition": "slope > 0 且持續上升"
+    },
+    {
+      "pattern": "下降趨勢",
+      "condition": "slope < 0 且持續下降"
+    },
+    {
+      "pattern": "趨勢轉折",
+      "condition": "slope 由負轉正（轉多）"
+    }
+  ],
+  "combines_with": [
+    "linearreg",
+    "tsf",
+    "stddev",
+    "ma_bull"
+  ],
+  "notes": "來源：TA-Lib LINEARREG_SLOPE。台股慣例：斜率方向比絕對值重要，搭配 ma_bull（多頭排列）確認趨勢品質；與既有 slope8/slope21（均線斜率）概念相近但計算對象不同（原始價格 vs 均線）。尚未實作於 compute_snapshot，需新增。",
+  "tags": [
+    "統計",
+    "上升趨勢",
+    "下降趨勢",
+    "趨勢轉折",
+    "linearreg",
+    "tsf",
+    "stddev",
+    "ma_bull"
+  ],
+  "llm_intent": "以統計方法計算價格的相對位置與分布，供均值回歸或偏離判斷（線性回歸斜率）"
+}

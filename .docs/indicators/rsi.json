@@ -1,0 +1,65 @@
+{
+  "metric": "rsi",
+  "name": "RSI 相對強弱指標",
+  "category": "momentum",
+  "definition": "衡量一段時間內漲跌相對強弱，判斷超買超賣。數值 0~100，越高越超買、越低越超賣。",
+  "formula": "RSI = 100 - 100 / (1 + RS)；RS = 期間平均漲幅 / 期間平均跌幅（Wilder 平滑：平均漲幅 = (前一日平均漲幅 × (period-1) + 今日漲幅) / period）",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 14,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常看 6（短）/ 12（中）/ 24（長）"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      100
+    ],
+    "meaning": ">70 超買（可能回檔），<30 超賣（可能反彈）"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_rsi",
+    "catalog_metric": "rsi"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "超買",
+      "condition": "RSI > 70"
+    },
+    {
+      "pattern": "超賣",
+      "condition": "RSI < 30"
+    },
+    {
+      "pattern": "黃金交叉",
+      "condition": "短週期 RSI 上穿長週期 RSI"
+    }
+  ],
+  "combines_with": [
+    "kdj",
+    "macd",
+    "vol_ratio"
+  ],
+  "notes": "來源：TA-Lib RSI (Wilder)。台股慣例：RSI(6) 看短線動能、RSI(24) 看中長線；搭配 KDJ 做雙重超買超賣確認。",
+  "tags": [
+    "動能",
+    "超買",
+    "超賣",
+    "黃金交叉",
+    "kdj",
+    "macd",
+    "vol_ratio"
+  ],
+  "llm_intent": "衡量價格變動的動能與速度，用於尋找超買超賣或動能持續性（RSI 相對強弱指標）"
+}

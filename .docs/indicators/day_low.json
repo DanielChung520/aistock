@@ -1,0 +1,43 @@
+{
+  "metric": "day_low",
+  "name": "單日最低價",
+  "category": "pattern",
+  "definition": "當日 K 線的最低價，是跌破比較的基礎價位，可作為短線支撐與跌破基準。",
+  "formula": "day_low = 當日 low",
+  "parameters": [],
+  "inputs": [
+    "low"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      100000
+    ],
+    "meaning": "當日最低股價（元），值越低代表當日空方壓力越強"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_day_low",
+    "catalog_metric": "day_low"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "當日支撐位",
+      "condition": "當日低點為短線支撐，收盤跌破後轉為壓力"
+    }
+  ],
+  "combines_with": [
+    "min_n",
+    "breakout_high3"
+  ],
+  "notes": "來源：台股型態學。尚未實作於 compute_snapshot，需新增。為跌破比較的基礎輸入，常與低價相關指標（min_n）搭配使用，也可作為三盤突破窄幅整理的組成參考。",
+  "tags": [
+    "型態",
+    "當日支撐位",
+    "min_n",
+    "breakout_high3"
+  ],
+  "llm_intent": "辨識價格型態與突破訊號，作為進出場的結構性依據（單日最低價）"
+}

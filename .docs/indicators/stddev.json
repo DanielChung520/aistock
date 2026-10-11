@@ -1,0 +1,69 @@
+{
+  "metric": "stddev",
+  "name": "STDDEV 標準差",
+  "category": "statistical",
+  "definition": "衡量收盤價在 N 期內偏離平均值的離散程度，反映價格波動的大小。標準差越大代表波動越劇烈，常用於波動度分析與布林通道的計算基礎。",
+  "formula": "STDDEV = sqrt(Σ(C(i) - SMA(C, n))² / (n - nbdev))；nbdev = 1 為樣本標準差（除以 n-1），nbdev = 0 為母體標準差（除以 n）；TA-Lib 另以乘數 nbdev 控制輸出倍數",
+  "parameters": [
+    {
+      "name": "timeperiod",
+      "default": 5,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 5（短）或 20（中，與布林同源）"
+    },
+    {
+      "name": "nbdev",
+      "default": 1,
+      "range": [
+        0,
+        10
+      ],
+      "tw_convention": "台股慣用 1（1 倍標準差）"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      null
+    ],
+    "meaning": "數值越大波動越大；0 代表 N 期內無價格變動"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_stddev",
+    "catalog_metric": "stddev"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "波動放大",
+      "condition": "STDDEV 快速上升（風險升高，可能趨勢發動）"
+    },
+    {
+      "pattern": "波動收縮",
+      "condition": "STDDEV 降至低檔（盤整，可能即將突破）"
+    }
+  ],
+  "combines_with": [
+    "linearreg_slope",
+    "bb_upper",
+    "atr"
+  ],
+  "notes": "來源：TA-Lib STDDEV。台股慣例：標準差為布林通道的核心積木（中線 ± 2 倍標準差）；波動收縮後常伴隨突破行情，可搭配 range3 使用。尚未實作於 compute_snapshot，需新增。",
+  "tags": [
+    "統計",
+    "波動放大",
+    "波動收縮",
+    "linearreg_slope",
+    "bb_upper",
+    "atr"
+  ],
+  "llm_intent": "以統計方法計算價格的相對位置與分布，供均值回歸或偏離判斷（STDDEV 標準差）"
+}

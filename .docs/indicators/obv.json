@@ -1,0 +1,53 @@
+{
+  "metric": "obv",
+  "name": "OBV 能量潮",
+  "category": "volume",
+  "definition": "將成交量依漲跌方向逐日累計（漲日加量、跌日減量），反映「量能是否支持價格趨勢」，是量價關係的核心指標。",
+  "formula": "OBV(t) = OBV(t-1) + sign(C(t) - C(t-1)) × V(t)；收盤漲（C > Cprev）加當日成交量、收盤跌（C < Cprev）減成交量、平盤不變",
+  "parameters": [],
+  "inputs": [
+    "close",
+    "volume"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      "-∞",
+      "∞"
+    ],
+    "meaning": "累計值本身無絕對意義，看趨勢方向與背離"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_obv",
+    "catalog_metric": "obv"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "量價背離",
+      "condition": "價格創新高但 OBV 未創新高（漲勢量能衰竭，可能反轉）"
+    },
+    {
+      "pattern": "OBV 領先創新",
+      "condition": "OBV 創新高領先價格（多方動能強，後續有補漲機會）"
+    }
+  ],
+  "combines_with": [
+    "vol_ratio",
+    "cmf",
+    "mfi",
+    "price"
+  ],
+  "notes": "來源：TA-Lib OBV（Granville）。尚未實作於 compute_snapshot。台股慣例：OBV 為累計值，需搭配價格觀察背離；電子權值股成交量基數大，OBV 斜率較陡，比較時以同族群為主。",
+  "tags": [
+    "量能",
+    "量價背離",
+    "OBV 領先創新",
+    "vol_ratio",
+    "cmf",
+    "mfi",
+    "price"
+  ],
+  "llm_intent": "分析成交量能變化，驗證價格走勢的可靠性與量價關係（OBV 能量潮）"
+}

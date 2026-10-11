@@ -1,0 +1,58 @@
+{
+  "metric": "ma89",
+  "name": "89日均線（MA89）",
+  "category": "trend",
+  "definition": "過去 89 個交易日收盤價的簡單移動平均（SMA），為長期趨勢指標，用於辨識長線多空架構與大波段方向。",
+  "formula": "MA89 = (C[t-88] + C[t-87] + ... + C[t]) / 89",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 89,
+      "range": [
+        1,
+        250
+      ],
+      "tw_convention": "台股慣用費氏級數 89（長期均線）"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      null
+    ],
+    "meaning": "89日平均價位；收盤價在 MA89 之上代表長期偏多"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_ma_daniel",
+    "catalog_metric": "ma89"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "長多",
+      "condition": "price > ma89"
+    },
+    {
+      "pattern": "長空",
+      "condition": "price < ma89"
+    }
+  ],
+  "combines_with": [
+    "ma55",
+    "trend"
+  ],
+  "notes": "來源：TA-Lib SMA（calculate_ma_daniel）。台股慣例：89 日線為長線趨勢參考，MA Daniel 指標的 trend 權重使用 MA8≥MA55≥MA89 判斷多頭架構（注意不含 MA21）。",
+  "tags": [
+    "趨勢",
+    "長多",
+    "長空",
+    "ma55",
+    "trend"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（89日均線（MA89））"
+}

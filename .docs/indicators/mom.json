@@ -1,0 +1,62 @@
+{
+  "metric": "mom",
+  "name": "MOM 動量指標",
+  "category": "momentum",
+  "definition": "計算今日收盤價與 N 日前收盤價的差額，直接衡量價格動能的絕對變化。正值代表 N 日內價格上漲，負值代表下跌；穿越 0 軸為常見買賣訊號。",
+  "formula": "MOM = C - C[n]；即今日收盤價減 N 日前的收盤價",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 10,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 10 或 12，短線可用 5"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": null,
+    "meaning": ">0 多方動能（N 日淨上漲），<0 空方動能；數值單位為價格"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_mom",
+    "catalog_metric": "mom"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "多頭動能",
+      "condition": "MOM > 0"
+    },
+    {
+      "pattern": "空頭動能",
+      "condition": "MOM < 0"
+    },
+    {
+      "pattern": "動能反轉",
+      "condition": "MOM 由下往上穿越 0 軸（買進訊號）"
+    }
+  ],
+  "combines_with": [
+    "roc",
+    "rsi",
+    "macd"
+  ],
+  "notes": "來源：TA-Lib MOM。台股慣例：MOM 為價格差值（非百分比），不同價位股票之間不可直接比較；搭配 ROC 看百分比版本可跨股比較。尚未實作於 compute_snapshot，需新增。",
+  "tags": [
+    "動能",
+    "多頭動能",
+    "空頭動能",
+    "動能反轉",
+    "roc",
+    "rsi",
+    "macd"
+  ],
+  "llm_intent": "衡量價格變動的動能與速度，用於尋找超買超賣或動能持續性（MOM 動量指標）"
+}

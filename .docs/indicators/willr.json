@@ -1,0 +1,67 @@
+{
+  "metric": "willr",
+  "name": "WILLR 威廉指標",
+  "category": "momentum",
+  "definition": "衡量目前收盤價在最近 N 日最高價與最低價區間中的相對位置，判斷超買超賣。數值介於 -100 到 0，越接近 0 越超買、越接近 -100 越超賣。",
+  "formula": "WILLR = -100 × (HHV(H, n) - C) / (HHV(H, n) - LLV(L, n))；HHV/LLV 為 N 日最高價/最低價",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 14,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常看 14（標準）或 9（短線）"
+    }
+  ],
+  "inputs": [
+    "high",
+    "low",
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      -100,
+      0
+    ],
+    "meaning": ">-20 超買（可能回檔），<-80 超賣（可能反彈）"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_willr",
+    "catalog_metric": "willr"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "超買",
+      "condition": "WILLR > -20"
+    },
+    {
+      "pattern": "超賣",
+      "condition": "WILLR < -80"
+    },
+    {
+      "pattern": "背離",
+      "condition": "股價創高而 WILLR 未創高（頂背離，看跌）"
+    }
+  ],
+  "combines_with": [
+    "rsi",
+    "kdj",
+    "cci"
+  ],
+  "notes": "來源：TA-Lib WILLR。台股慣例：-80/-20 為超賣超買門檻，與 RSI 互補（WILLR 對價格波動較敏感）；常與 KDJ 同屬擺盪指標搭配確認。尚未實作於 compute_snapshot，需新增。",
+  "tags": [
+    "動能",
+    "超買",
+    "超賣",
+    "背離",
+    "rsi",
+    "kdj",
+    "cci"
+  ],
+  "llm_intent": "衡量價格變動的動能與速度，用於尋找超買超賣或動能持續性（WILLR 威廉指標）"
+}

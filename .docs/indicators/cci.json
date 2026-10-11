@@ -1,0 +1,64 @@
+{
+  "metric": "cci",
+  "name": "CCI 順勢指標",
+  "category": "momentum",
+  "definition": "衡量股價偏離其統計平均值的程度，判斷超買超賣與趨勢強弱。數值不受價格區間限制，±100 為常見的進出場門檻。",
+  "formula": "CCI = (TP - SMA(TP, n)) / (0.015 × MD)；TP（典型價格）= (H + L + C) / 3；MD = 平均絕對偏差（Mean Deviation）= Σ|TP - SMA(TP, n)| / n",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 20,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常看 14 或 20，短線可縮至 5"
+    }
+  ],
+  "inputs": [
+    "high",
+    "low",
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": null,
+    "meaning": ">+100 超買（偏離均值過遠），<-100 超賣；數值越大動能越強"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_cci",
+    "catalog_metric": "cci"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "超買",
+      "condition": "CCI > +100"
+    },
+    {
+      "pattern": "超賣",
+      "condition": "CCI < -100"
+    },
+    {
+      "pattern": "趨勢突破",
+      "condition": "CCI 由 +100 下方上穿 +100（多頭發動）"
+    }
+  ],
+  "combines_with": [
+    "rsi",
+    "kdj",
+    "macd"
+  ],
+  "notes": "來源：TA-Lib CCI。台股慣例：CCI 突破 +100 代表脫離盤整區進入強勢，跌破 -100 代表弱勢；搭配 RSI/KDJ 做超買超賣雙重確認。尚未實作於 compute_snapshot，需新增。",
+  "tags": [
+    "動能",
+    "超買",
+    "超賣",
+    "趨勢突破",
+    "rsi",
+    "kdj",
+    "macd"
+  ],
+  "llm_intent": "衡量價格變動的動能與速度，用於尋找超買超賣或動能持續性（CCI 順勢指標）"
+}

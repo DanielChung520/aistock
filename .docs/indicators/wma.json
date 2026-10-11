@@ -1,0 +1,65 @@
+{
+  "metric": "wma",
+  "name": "WMA 加權移動平均",
+  "category": "trend",
+  "definition": "對近期價格賦予線性遞增權重的移動平均，比 SMA 重視最新價格、比 EMA 的衰減更均勻，常用於趨勢確認。",
+  "formula": "WMA = Σ(price_i × weight_i) / Σ(weight_i)；權重線性遞增：最遠期權重為 1，最近期權重為 n",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 30,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 20（月線）或 30"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      "-∞",
+      "∞"
+    ],
+    "meaning": "加權均價：價格在其上為多頭、其下為空頭"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_wma",
+    "catalog_metric": "wma"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "黃金交叉",
+      "condition": "短週期 WMA 上穿長週期 WMA（轉多）"
+    },
+    {
+      "pattern": "死亡交叉",
+      "condition": "短週期 WMA 下穿長週期 WMA（轉空）"
+    },
+    {
+      "pattern": "突破確認",
+      "condition": "價格放量突破 WMA（趨勢確認）"
+    }
+  ],
+  "combines_with": [
+    "ema",
+    "ma_bull",
+    "hma"
+  ],
+  "notes": "來源：TA-Lib WMA。尚未實作於 compute_snapshot。台股慣例：WMA(30) 為 TA-Lib 預設；比 EMA 更重視近期價格，適合短波段與突破確認。",
+  "tags": [
+    "趨勢",
+    "黃金交叉",
+    "死亡交叉",
+    "突破確認",
+    "ema",
+    "ma_bull",
+    "hma"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（WMA 加權移動平均）"
+}

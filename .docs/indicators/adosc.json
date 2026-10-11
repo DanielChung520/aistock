@@ -1,0 +1,79 @@
+{
+  "metric": "adosc",
+  "name": "ADOSC 蔡金 A/D 振盪",
+  "category": "volume",
+  "definition": "Chaikin A/D 線的兩條 EMA 差值，衡量量能動能的短中長期變化，以 0 軸穿越與背離判斷多空轉折。",
+  "formula": "MFM = ((C - L) - (H - C)) / (H - L)；A/D Line 逐日累計：AD(t) = AD(t-1) + MFM × volume；ADOSC = EMA(AD, fast) - EMA(AD, slow)",
+  "parameters": [
+    {
+      "name": "fastperiod",
+      "default": 3,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 3（fast）"
+    },
+    {
+      "name": "slowperiod",
+      "default": 10,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 10（slow）"
+    }
+  ],
+  "inputs": [
+    "high",
+    "low",
+    "close",
+    "volume"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      "-∞",
+      "∞"
+    ],
+    "meaning": "正值代表量能動能偏多、負值偏空；0 軸為多空分界"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_adosc",
+    "catalog_metric": "adosc"
+  },
+  "depends_on": [
+    "ema"
+  ],
+  "signals": [
+    {
+      "pattern": "上穿零軸",
+      "condition": "ADOSC 由負轉正（量能動能轉多）"
+    },
+    {
+      "pattern": "下穿零軸",
+      "condition": "ADOSC 由正轉負（量能動能轉空）"
+    },
+    {
+      "pattern": "背離",
+      "condition": "價格創新高但 ADOSC 未創新高"
+    }
+  ],
+  "combines_with": [
+    "obv",
+    "cmf",
+    "macd"
+  ],
+  "notes": "來源：TA-Lib ADOSC（Chaikin A/D Oscillator）。尚未實作於 compute_snapshot。台股慣例：fast=3 / slow=10 為 TA-Lib 預設，短線以 0 軸穿越為進出參考。",
+  "tags": [
+    "量能",
+    "上穿零軸",
+    "下穿零軸",
+    "背離",
+    "obv",
+    "cmf",
+    "macd"
+  ],
+  "llm_intent": "分析成交量能變化，驗證價格走勢的可靠性與量價關係（ADOSC 蔡金 A/D 振盪）"
+}

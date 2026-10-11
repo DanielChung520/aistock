@@ -1,0 +1,53 @@
+{
+  "metric": "min_n",
+  "name": "N 日最低價",
+  "category": "pattern",
+  "definition": "最近 N 根 K 線的最低價，對應 TA-Lib MIN，作為支撐位判斷與跌破比較的基準。",
+  "formula": "min_n = min(low[-N:])；即最近 N 日（含今日）的最低價，對應 TA-Lib MIN",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 20,
+      "range": [
+        2,
+        250
+      ],
+      "tw_convention": "台股常用 20 日（月支撐）/ 60 日（季支撐）/ 250 日（年支撐）"
+    }
+  ],
+  "inputs": [
+    "low"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      100000
+    ],
+    "meaning": "最近 N 日最低股價（元），為支撐位參考，可與 close 比較判斷是否跌破"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_min_n",
+    "catalog_metric": "min_n"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "支撐位",
+      "condition": "close 接近 min_n 時為支撐測試，放量跌破後支撐轉壓力"
+    }
+  ],
+  "combines_with": [
+    "day_low",
+    "breakout_high3"
+  ],
+  "notes": "來源：台股型態學。對應 TA-Lib MIN（Lowest）。尚未實作於 compute_snapshot，需新增。與 max_n 成對使用構成壓力/支撐框架，亦可做為三盤突破窄幅整理的區間下緣。",
+  "tags": [
+    "型態",
+    "支撐位",
+    "day_low",
+    "breakout_high3"
+  ],
+  "llm_intent": "辨識價格型態與突破訊號，作為進出場的結構性依據（N 日最低價）"
+}

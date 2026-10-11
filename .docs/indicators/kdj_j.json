@@ -1,0 +1,65 @@
+{
+  "metric": "kdj_j",
+  "name": "KDJ J 值",
+  "category": "momentum",
+  "definition": "KDJ 隨機指標的 J 值，為 K 值與 D 值的偏離度（3K - 2D），反應最快、最敏感，可超出 0~100 區間，常用於極端超買超賣與轉折預警。",
+  "formula": "J = 3 × K - 2 × D",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 9,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股慣用 9"
+    }
+  ],
+  "inputs": [
+    "high",
+    "low",
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      null,
+      null
+    ],
+    "meaning": ">100 極度超買（短線過熱），<0 極度超賣（短線超跌）"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_kdj",
+    "catalog_metric": "kdj_j"
+  },
+  "depends_on": [
+    "kdj_k",
+    "kdj_d"
+  ],
+  "signals": [
+    {
+      "pattern": "極度超買",
+      "condition": "kdj_j > 100"
+    },
+    {
+      "pattern": "極度超賣",
+      "condition": "kdj_j < 0"
+    }
+  ],
+  "combines_with": [
+    "kdj_k",
+    "kdj_d",
+    "rsi"
+  ],
+  "notes": "來源：TA-Lib STOCH 延伸（J 值為台股/KDJ 慣例，非 TA-Lib 標準輸出）。台股慣例：KDJ(9,3,3)；J 值可超過 0~100，高檔 J>100 常伴隨短線回檔。",
+  "tags": [
+    "動能",
+    "極度超買",
+    "極度超賣",
+    "kdj_k",
+    "kdj_d",
+    "rsi"
+  ],
+  "llm_intent": "衡量價格變動的動能與速度，用於尋找超買超賣或動能持續性（KDJ J 值）"
+}

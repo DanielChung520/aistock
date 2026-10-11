@@ -1,0 +1,73 @@
+{
+  "metric": "mfi",
+  "name": "MFI 資金流量指標",
+  "category": "momentum",
+  "definition": "以典型價格乘成交量衡量資金流向（量能版的 RSI），判斷超買超賣與價量背離。數值 0~100，>80 超買、<20 超賣；與股價背離時具較高參考價值。",
+  "formula": "MFI = 100 - 100 / (1 + 正向資金流 / 負向資金流)；典型價格 TP = (H + L + C) / 3；資金流 = TP × volume；正向資金流 = TP 上升日的資金流加總（n 期），負向資金流 = TP 下降日的資金流加總（n 期）",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 14,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 14，短線可用 7"
+    }
+  ],
+  "inputs": [
+    "high",
+    "low",
+    "close",
+    "volume"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      100
+    ],
+    "meaning": ">80 超買（資金過熱），<20 超賣（資金退潮）"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_mfi",
+    "catalog_metric": "mfi"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "超買",
+      "condition": "MFI > 80"
+    },
+    {
+      "pattern": "超賣",
+      "condition": "MFI < 20"
+    },
+    {
+      "pattern": "頂背離",
+      "condition": "股價創高而 MFI 未創高（看跌）"
+    },
+    {
+      "pattern": "底背離",
+      "condition": "股價創新低而 MFI 未創新低（看漲）"
+    }
+  ],
+  "combines_with": [
+    "vol_ratio",
+    "rsi",
+    "obv"
+  ],
+  "notes": "來源：TA-Lib MFI。台股慣例：MFI 為唯一需 volume 輸入的動能指標，背離訊號在大型權值股（2330 等）較可靠；與 OBV 同屬量價分析工具。尚未實作於 compute_snapshot，需新增。",
+  "tags": [
+    "動能",
+    "超買",
+    "超賣",
+    "頂背離",
+    "底背離",
+    "vol_ratio",
+    "rsi",
+    "obv"
+  ],
+  "llm_intent": "衡量價格變動的動能與速度，用於尋找超買超賣或動能持續性（MFI 資金流量指標）"
+}

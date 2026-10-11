@@ -1,0 +1,78 @@
+{
+  "metric": "kdj_k",
+  "name": "KDJ K 值",
+  "category": "momentum",
+  "definition": "KDJ 隨機指標的 K 值，由 RSV（未成熟隨機值）平滑而來，反映近期收盤價在 9 日高低區間中的相對位置，數值越高代表越接近區間高點。",
+  "formula": "RSV = (C[t] - LL9) / (HH9 - LL9) × 100；K = (1/3) × RSV + (2/3) × K[t-1]（初始 K=50；HH9/LL9 為近 9 日最高/最低）",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 9,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股慣用 9"
+    },
+    {
+      "name": "k_smooth",
+      "default": 3,
+      "range": [
+        1,
+        10
+      ],
+      "tw_convention": "台股慣用 3"
+    }
+  ],
+  "inputs": [
+    "high",
+    "low",
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      100
+    ],
+    "meaning": ">80 超買（可能回檔），<20 超賣（可能反彈）"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_kdj",
+    "catalog_metric": "kdj_k"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "超買",
+      "condition": "kdj_k > 80"
+    },
+    {
+      "pattern": "超賣",
+      "condition": "kdj_k < 20"
+    },
+    {
+      "pattern": "黃金交叉",
+      "condition": "kdj_k 上穿 kdj_d（cross_above）"
+    }
+  ],
+  "combines_with": [
+    "kdj_d",
+    "kdj_j",
+    "rsi",
+    "vol_ratio"
+  ],
+  "notes": "來源：TA-Lib STOCH（KD 隨機指標）。台股慣例：KDJ(9,3,3)；K 值與 D 值金叉/死叉搭配超買超賣區使用；注意未滿 9 根K棒或高低點相同時 RSV 以 50 計（實作於 calculate_kdj）。",
+  "tags": [
+    "動能",
+    "超買",
+    "超賣",
+    "黃金交叉",
+    "kdj_d",
+    "kdj_j",
+    "rsi",
+    "vol_ratio"
+  ],
+  "llm_intent": "衡量價格變動的動能與速度，用於尋找超買超賣或動能持續性（KDJ K 值）"
+}

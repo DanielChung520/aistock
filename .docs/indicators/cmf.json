@@ -1,0 +1,70 @@
+{
+  "metric": "cmf",
+  "name": "CMF 蔡金資金流",
+  "category": "volume",
+  "definition": "以收盤位置在當日高低區間的比例乘上成交量，衡量一段期間內資金淨流入或淨流出，數值介於 -1 與 1 之間。",
+  "formula": "MFM（資金流乘數）= ((C - L) - (H - C)) / (H - L)；MFV = MFM × volume；CMF = Σ(MFV, n) / Σ(volume, n)",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 20,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 20（對應月線週期）"
+    }
+  ],
+  "inputs": [
+    "high",
+    "low",
+    "close",
+    "volume"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      -1,
+      1
+    ],
+    "meaning": "> 0 資金淨流入，< 0 資金淨流出；|值| > 0.1 為明顯訊號"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_cmf",
+    "catalog_metric": "cmf"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "資金流入",
+      "condition": "CMF > 0.1（多方資金持續進場）"
+    },
+    {
+      "pattern": "資金流出",
+      "condition": "CMF < -0.1（空方壓力）"
+    },
+    {
+      "pattern": "資金背離",
+      "condition": "價格創高但 CMF 走低（上漲缺乏資金支持）"
+    }
+  ],
+  "combines_with": [
+    "obv",
+    "mfi",
+    "vol_ratio",
+    "adosc"
+  ],
+  "notes": "來源：TA-Lib CMF（Chaikin Money Flow）。尚未實作於 compute_snapshot。台股慣例：CMF(20) 常用；搭配 K 線型態突破（如三盤突破）確認資金是否真的進場。",
+  "tags": [
+    "量能",
+    "資金流入",
+    "資金流出",
+    "資金背離",
+    "obv",
+    "mfi",
+    "vol_ratio",
+    "adosc"
+  ],
+  "llm_intent": "分析成交量能變化，驗證價格走勢的可靠性與量價關係（CMF 蔡金資金流）"
+}

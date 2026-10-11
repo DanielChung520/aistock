@@ -1,0 +1,73 @@
+{
+  "metric": "bb_upper",
+  "name": "布林上軌",
+  "category": "volatility",
+  "definition": "布林通道上軌 = 中軌 + 2 × 標準差，代表價格在統計上的上方波動邊界；價格觸及或突破上軌代表強勢或短期超買。",
+  "formula": "BB_upper = SMA(close, 20) + 2 × σ；σ = sqrt(Σ(C[t] - SMA20)² / 20)（母體標準差）",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 20,
+      "range": [
+        2,
+        200
+      ],
+      "tw_convention": "台股慣用 20"
+    },
+    {
+      "name": "std_dev",
+      "default": 2,
+      "range": [
+        1,
+        5
+      ],
+      "tw_convention": "台股慣用 2"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      null
+    ],
+    "meaning": "上軌價位；價格突破上軌代表強勢上漲（可能短期超買）"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_bollinger",
+    "catalog_metric": "bb_upper"
+  },
+  "depends_on": [
+    "bb_middle"
+  ],
+  "signals": [
+    {
+      "pattern": "突破上軌",
+      "condition": "price 上穿 bb_upper（cross_above，強勢）"
+    },
+    {
+      "pattern": "觸及上軌",
+      "condition": "price >= bb_upper"
+    }
+  ],
+  "combines_with": [
+    "bb_middle",
+    "bb_lower",
+    "bb_width",
+    "kdj_k"
+  ],
+  "notes": "來源：TA-Lib BBANDS（calculate_bollinger，標準差採母體公式除以 N，非樣本 N-1）。台股慣例：布林(20,2)；突破上軌搭配 KDJ 高檔可確認短線過熱。",
+  "tags": [
+    "波動",
+    "突破上軌",
+    "觸及上軌",
+    "bb_middle",
+    "bb_lower",
+    "bb_width",
+    "kdj_k"
+  ],
+  "llm_intent": "衡量價格波動幅度與風險，用於停損設定與波動率判斷（布林上軌）"
+}

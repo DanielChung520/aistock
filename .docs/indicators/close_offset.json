@@ -1,0 +1,62 @@
+{
+  "metric": "close_offset",
+  "name": "扣抵值（MA8 扣抵）",
+  "category": "trend",
+  "definition": "台股扣抵值概念：未來將被移出 MA8 計算窗口的那 8 日收盤均價（即 8 根K棒前的 MA8 值）。比較現價與扣抵值可推斷 MA8 未來是上揚還是下彎。",
+  "formula": "close_offset = SMA(close[8根K棒前視窗], 8) = (C[t-15] + C[t-14] + ... + C[t-8]) / 8；即 lookback=8 根前的 8 日均價（Pine 語法 ta.sma(close[8], 8)）",
+  "parameters": [
+    {
+      "name": "lookback",
+      "default": 8,
+      "range": [
+        1,
+        60
+      ],
+      "tw_convention": "台股扣抵值慣用與短均線相同參數（8 日）"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      null
+    ],
+    "meaning": "扣抵價位；當現價 > 扣抵值時 MA8 未來易上揚，現價 < 扣抵值時 MA8 易下彎"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_ma_daniel",
+    "catalog_metric": "close_offset"
+  },
+  "depends_on": [
+    "ma8"
+  ],
+  "signals": [
+    {
+      "pattern": "均線易上揚",
+      "condition": "price > close_offset（未來扣抵值低）"
+    },
+    {
+      "pattern": "均線易下彎",
+      "condition": "price < close_offset（未來扣抵值高）"
+    }
+  ],
+  "combines_with": [
+    "ma8",
+    "price",
+    "trend"
+  ],
+  "notes": "來源：台股自定義（扣抵值概念），取自 MA Daniel Pine 指標（見 .docs/indicator001.md）。實作於 calculate_ma_daniel：當 i - lookback + 1 >= lookback 時，取 closes[i - 2*lookback + 1 : i - lookback + 1] 的平均。",
+  "tags": [
+    "趨勢",
+    "均線易上揚",
+    "均線易下彎",
+    "ma8",
+    "price",
+    "trend"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（扣抵值（MA8 扣抵））"
+}

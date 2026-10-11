@@ -1,0 +1,64 @@
+{
+  "metric": "trix",
+  "name": "TRIX 三重指數平滑指標",
+  "category": "momentum",
+  "definition": "對收盤價做三次指數平滑（EMA of EMA of EMA）後，再計算其 1 日變動率，過濾短線雜訊、呈現中長期趨勢動能。穿越 0 軸與訊號線交叉為買賣訊號。",
+  "formula": "TRIX = 1-day ROC of Triple Smooth EMA = (EMA3(t) - EMA3(t-1)) / EMA3(t-1) × 100；EMA3 = EMA(EMA(EMA(close, n), n), n)，即對收盤價連續套用三次週期為 n 的指數平滑",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 15,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 12 或 20，屬中長線指標"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": null,
+    "meaning": ">0 中長期動能向上，<0 向下；單位為百分比"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_trix",
+    "catalog_metric": "trix"
+  },
+  "depends_on": [
+    "ema"
+  ],
+  "signals": [
+    {
+      "pattern": "多頭趨勢",
+      "condition": "TRIX > 0 且向上"
+    },
+    {
+      "pattern": "空頭趨勢",
+      "condition": "TRIX < 0 且向下"
+    },
+    {
+      "pattern": "趨勢轉折",
+      "condition": "TRIX 由下往上穿越 0 軸（買進訊號）"
+    }
+  ],
+  "combines_with": [
+    "macd",
+    "ma_bull",
+    "rsi"
+  ],
+  "notes": "來源：TA-Lib TRIX。台股慣例：三次平滑使 TRIX 反應較慢，適合中長線波段；短線操作建議改用短週期或搭配 MACD。尚未實作於 compute_snapshot，需新增。",
+  "tags": [
+    "動能",
+    "多頭趨勢",
+    "空頭趨勢",
+    "趨勢轉折",
+    "macd",
+    "ma_bull",
+    "rsi"
+  ],
+  "llm_intent": "衡量價格變動的動能與速度，用於尋找超買超賣或動能持續性（TRIX 三重指數平滑指標）"
+}

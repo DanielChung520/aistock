@@ -1,0 +1,67 @@
+{
+  "metric": "dx",
+  "name": "DX 趨向指標",
+  "category": "momentum",
+  "definition": "衡量多空趨向力量的差異程度，是 ADX 的原始值。DX 越高代表多空力量差距越大，趨勢越明確；DX 經平滑後即為 ADX。",
+  "formula": "DX = 100 × |+DI - -DI| / (+DI + -DI)；+DI = 100 × 平滑後的 +DM / ATR 相關值；-DI = 100 × 平滑後的 -DM / ATR 相關值",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 14,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 14，與 ADX 同參數"
+    }
+  ],
+  "inputs": [
+    "high",
+    "low",
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      0,
+      100
+    ],
+    "meaning": "數值越大多空趨向差異越大；結合 +DI > -DI 判斷方向"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_dx",
+    "catalog_metric": "dx"
+  },
+  "depends_on": [],
+  "signals": [
+    {
+      "pattern": "多頭趨向",
+      "condition": "DX 上升且 +DI > -DI"
+    },
+    {
+      "pattern": "空頭趨向",
+      "condition": "DX 上升且 -DI > +DI"
+    },
+    {
+      "pattern": "趨勢衰退",
+      "condition": "DX 高檔回落"
+    }
+  ],
+  "combines_with": [
+    "adx",
+    "macd",
+    "atr"
+  ],
+  "notes": "來源：TA-Lib DX。台股慣例：DX 為 ADX 的基礎，實務上多以 ADX 觀察平滑後的趨勢強度，DX 單日波動較大；兩者常共用同一組 +DI/-DI 計算。尚未實作於 compute_snapshot，需新增。",
+  "tags": [
+    "動能",
+    "多頭趨向",
+    "空頭趨向",
+    "趨勢衰退",
+    "adx",
+    "macd",
+    "atr"
+  ],
+  "llm_intent": "衡量價格變動的動能與速度，用於尋找超買超賣或動能持續性（DX 趨向指標）"
+}

@@ -1,0 +1,85 @@
+{
+  "metric": "pvo",
+  "name": "PVO 百分比成交量振盪",
+  "category": "volume",
+  "definition": "以兩條不同週期成交量 EMA 的百分比差值，衡量成交量擴張或萎縮的程度，與 PPO 同構但輸入為成交量。",
+  "formula": "PVO = (EMA(volume, fast) - EMA(volume, slow)) / EMA(volume, slow) × 100",
+  "parameters": [
+    {
+      "name": "fastperiod",
+      "default": 12,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股慣用 12（與 MACD 同週期）"
+    },
+    {
+      "name": "slowperiod",
+      "default": 26,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股慣用 26（與 MACD 同週期）"
+    },
+    {
+      "name": "signalperiod",
+      "default": 9,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股慣用 9，作為訊號線"
+    }
+  ],
+  "inputs": [
+    "volume"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      "-∞",
+      "∞"
+    ],
+    "meaning": "正值代表成交量擴張（> 0），負值代表萎縮（< 0），以百分比呈現"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_pvo",
+    "catalog_metric": "pvo"
+  },
+  "depends_on": [
+    "ema"
+  ],
+  "signals": [
+    {
+      "pattern": "量能擴張",
+      "condition": "PVO > 0（成交量處於放大狀態）"
+    },
+    {
+      "pattern": "量能萎縮",
+      "condition": "PVO < 0（成交量萎縮，盤整）"
+    },
+    {
+      "pattern": "訊號線交叉",
+      "condition": "PVO 上穿其 9 期訊號線（量能動能轉強）"
+    }
+  ],
+  "combines_with": [
+    "vol_ratio",
+    "macd",
+    "obv"
+  ],
+  "notes": "來源：TA-Lib PVO（Percentage Volume Oscillator）。尚未實作於 compute_snapshot。台股慣例：12/26/9 與 MACD 週期一致，可對照價格 MACD 確認量價同步性。",
+  "tags": [
+    "量能",
+    "量能擴張",
+    "量能萎縮",
+    "訊號線交叉",
+    "vol_ratio",
+    "macd",
+    "obv"
+  ],
+  "llm_intent": "分析成交量能變化，驗證價格走勢的可靠性與量價關係（PVO 百分比成交量振盪）"
+}

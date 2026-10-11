@@ -1,0 +1,67 @@
+{
+  "metric": "dema",
+  "name": "DEMA 雙重指數移動平均",
+  "category": "trend",
+  "definition": "由兩層 EMA 線性組合而成，降低單層 EMA 的落後性，趨勢變化反應介於 EMA 與 TEMA 之間。",
+  "formula": "DEMA = 2 × EMA(price) - EMA(EMA(price))",
+  "parameters": [
+    {
+      "name": "period",
+      "default": 30,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 20（對應月線）"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "number",
+    "range": [
+      "-∞",
+      "∞"
+    ],
+    "meaning": "低延遲均價：價格在其上為多頭、其下為空頭"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_dema",
+    "catalog_metric": "dema"
+  },
+  "depends_on": [
+    "ema"
+  ],
+  "signals": [
+    {
+      "pattern": "黃金交叉",
+      "condition": "短週期 DEMA 上穿長週期 DEMA（轉多）"
+    },
+    {
+      "pattern": "死亡交叉",
+      "condition": "短週期 DEMA 下穿長週期 DEMA（轉空）"
+    },
+    {
+      "pattern": "站上/跌破",
+      "condition": "價格站上 DEMA 為多、跌破為空"
+    }
+  ],
+  "combines_with": [
+    "ema",
+    "tema",
+    "macd"
+  ],
+  "notes": "來源：TA-Lib DEMA（Double Exponential Moving Average，Patrick Mulloy 1994）。尚未實作於 compute_snapshot。台股慣例：延遲介於 EMA 與 TEMA 之間，20 期常用於月線等級的趨勢判斷。",
+  "tags": [
+    "趨勢",
+    "黃金交叉",
+    "死亡交叉",
+    "站上/跌破",
+    "ema",
+    "tema",
+    "macd"
+  ],
+  "llm_intent": "判斷價格趨勢方向與強度，作為順勢交易或多空分界的依據（DEMA 雙重指數移動平均）"
+}

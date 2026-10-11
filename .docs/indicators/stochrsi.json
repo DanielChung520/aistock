@@ -1,0 +1,85 @@
+{
+  "metric": "stochrsi",
+  "name": "STOCHRSI 隨機 RSI",
+  "category": "momentum",
+  "definition": "先計算 RSI，再將 RSI 套用隨機指標（STOCH）公式，使 RSI 在 0~100 區間內標準化，放大超買超賣敏感度。在趨勢盤中比 RSI 更早發出轉折訊號。",
+  "formula": "STOCHRSI = STOCH(RSI) = (RSI(t) - min(RSI, n)) / (max(RSI, n) - min(RSI, n)) × 100；再以 fastk_period 對其做平滑（%K），%D 為 %K 的 fastd_period 平滑",
+  "parameters": [
+    {
+      "name": "timeperiod",
+      "default": 14,
+      "range": [
+        2,
+        100
+      ],
+      "tw_convention": "台股常用 14"
+    },
+    {
+      "name": "fastk_period",
+      "default": 5,
+      "range": [
+        1,
+        100
+      ],
+      "tw_convention": "台股常用 5（與 KDJ 慣例一致）"
+    },
+    {
+      "name": "fastd_period",
+      "default": 3,
+      "range": [
+        1,
+        100
+      ],
+      "tw_convention": "台股常用 3"
+    }
+  ],
+  "inputs": [
+    "close"
+  ],
+  "outputs": {
+    "type": "object",
+    "range": [
+      0,
+      100
+    ],
+    "meaning": "%K/%D 皆在 0~100；>80 超買，<20 超賣"
+  },
+  "implementation": {
+    "implemented": true,
+    "function": "calculate_stochrsi",
+    "catalog_metric": "stochrsi_k / stochrsi_d"
+  },
+  "depends_on": [
+    "rsi"
+  ],
+  "signals": [
+    {
+      "pattern": "超買",
+      "condition": "STOCHRSI %K > 80"
+    },
+    {
+      "pattern": "超賣",
+      "condition": "STOCHRSI %K < 20"
+    },
+    {
+      "pattern": "黃金交叉",
+      "condition": "%K 由下往上穿越 %D"
+    }
+  ],
+  "combines_with": [
+    "rsi",
+    "kdj",
+    "macd"
+  ],
+  "notes": "來源：TA-Lib STOCHRSI。台股慣例：STOCHRSI 對超買超賣比 RSI 敏感，容易出現鈍化，宜搭配 KDJ 或 MACD 確認；參數慣用 14/5/3 與台股 KDJ 9/3/3 概念相近。尚未實作於 compute_snapshot，需新增。",
+  "tags": [
+    "動能",
+    "超買",
+    "超賣",
+    "黃金交叉",
+    "rsi",
+    "kdj",
+    "macd"
+  ],
+  "llm_intent": "衡量價格變動的動能與速度，用於尋找超買超賣或動能持續性（STOCHRSI 隨機 RSI）"
+}
