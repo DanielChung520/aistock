@@ -26,7 +26,13 @@ export default function TXRLTrainingPage() {
   const [status, setStatus] = useState<Status>('idle')
   const [currentStep, setCurrentStep] = useState(0)
   const [totalSteps, setTotalSteps] = useState<number>(INITIAL_TOTAL_STEPS)
+  const [accumulatedSteps, setAccumulatedSteps] = useState(0)
   const [elapsed, setElapsed] = useState(0)
+  const [etaSeconds, setEtaSeconds] = useState<number | null>(null)
+  const [foldIdx, setFoldIdx] = useState(1)
+  const [nFolds, setNFolds] = useState(1)
+  const [currentReward, setCurrentReward] = useState(0)
+  const [lastUpdateTs, setLastUpdateTs] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -49,11 +55,19 @@ export default function TXRLTrainingPage() {
           const d = await r.json()
           setStatus(d.status as Status)
           setCurrentStep(d.progress?.current_step ?? 0)
-          setElapsed(Math.floor((Date.now() - start) / 1000))
+          setTotalSteps(d.progress?.total_steps ?? INITIAL_TOTAL_STEPS)
+          setAccumulatedSteps(d.progress?.accumulated_steps ?? 0)
+          setElapsed(d.elapsed_seconds ?? Math.floor((Date.now() - start) / 1000))
+          setEtaSeconds(d.eta_seconds ?? null)
+          setFoldIdx(d.progress?.fold_idx ?? 1)
+          setNFolds(d.progress?.n_folds ?? 1)
+          setCurrentReward(d.progress?.current_reward ?? 0)
+          setLastUpdateTs(d.progress?.last_update_ts ?? 0)
           if (d.status === 'completed' || d.status === 'failed' || d.status === 'stopped') {
             if (timerRef.current) clearInterval(timerRef.current)
             if (d.status === 'completed') toast.success('訓練完成', { description: '可前往回測頁查看結果' })
             if (d.status === 'failed') toast.error('訓練失敗', { description: d.error })
+            if (d.status === 'stopped') toast.warning('訓練已停止', { description: '可從環境定義頁重新啟動' })
             return
           }
         }
@@ -85,9 +99,21 @@ export default function TXRLTrainingPage() {
     toast.warning('已停止（mock）')
   }
 
-  const pct = totalSteps > 0 ? Math.round((currentStep / totalSteps) * 100) : 0
+  const pct = accumulatedSteps > 0 && totalSteps > 0
+    ? Math.round((accumulatedSteps / totalSteps) * 100)
+    : (totalSteps > 0 ? Math.round((currentStep / totalSteps) * 100) : 0)
+  const foldPct = currentStep > 0 && totalSteps > 0 && nFolds > 1
+    ? Math.round((currentStep / (totalSteps / nFolds)) * 100)
+    : pct
   const isRunning = status === 'running'
   const isCompleted = status === 'completed'
+  const isStuck = isRunning && lastUpdateTs > 0 && (Math.floor(Date.now() / 1000) - lastUpdateTs > 60)
+  const fmtDuration = (s: number | null | undefined) => {
+    if (s === null || s === undefined) return '—'
+    const m = Math.floor(s / 60)
+    const sec = s % 60
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`
+  }
 
   return (
     <>
@@ -163,18 +189,44 @@ export default function TXRLTrainingPage() {
               <CardHeader className="pb-3">
                 <BlockTitle title="訓練進度" helpContent={TRAINING_PROGRESS_MD}>
                   <CardDescription className="text-xs">
-                    {status === 'running' ? '訓練進行中，每 2 秒更新' : status === 'completed' ? '訓練已完成，可至回測頁看結果' : '等待啟動'}
+                    {status === 'running'
+                      ? (isStuck ? '⚠️ 訓練卡住（超過 60s 沒更新）' : `訓練進行中，每 2 秒更新 · fold ${foldIdx}/${nFolds}`)
+                      : status === 'completed'
+                        ? '訓練已完成，可至回測頁看結果'
+                        : '等待啟動'}
                   </CardDescription>
                 </BlockTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-3">
-                  <Stat label="當前 Step" value={currentStep > 0 ? currentStep.toLocaleString() : '—'} />
-                  <Stat label="總步數" value={totalSteps.toLocaleString()} />
-                  <Stat label="耗時" value={elapsed > 0 ? `${elapsed}s` : '—'} />
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <Stat label="當前 Fold Step" value={currentStep > 0 ? currentStep.toLocaleString() : '—'} mono />
+                  <Stat label="Fold X / N" value={`${foldIdx} / ${nFolds}`} mono />
+                  <Stat label="累計 Step" value={accumulatedSteps > 0 ? accumulatedSteps.toLocaleString() : '—'} mono />
+                  <Stat label="總步數" value={totalSteps > 0 ? totalSteps.toLocaleString() : '—'} mono />
                 </div>
-                <div className="text-[10px] text-muted-foreground mt-3 pt-3 border-t border-border/50">
-                  演算法: PPO (預設) · Action: discrete_3 · Reward: pure_pnl · State features: 12 維
+
+                <div>
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+                    <span>總進度</span>
+                    <span className="font-mono">{pct}%</span>
+                  </div>
+                  <Progress value={pct} className="h-2" />
+                </div>
+
+                {nFolds > 1 && (
+                  <div>
+                    <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+                      <span>當前 Fold 進度</span>
+                      <span className="font-mono">{Math.min(100, foldPct)}%</span>
+                    </div>
+                    <Progress value={Math.min(100, foldPct)} className="h-1.5 bg-muted [&>div]:bg-blue-500" />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <Stat label="耗時" value={fmtDuration(elapsed)} />
+                  <Stat label="ETA" value={fmtDuration(etaSeconds)} />
+                  <Stat label="Reward" value={currentReward !== 0 ? currentReward.toFixed(2) : '—'} mono />
                 </div>
               </CardContent>
             </Card>
@@ -197,11 +249,11 @@ export default function TXRLTrainingPage() {
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="rounded-md border bg-muted/30 px-3 py-2 text-center">
       <div className="text-[10px] text-muted-foreground">{label}</div>
-      <div className="text-sm font-bold tabular-nums mt-0.5">{value}</div>
+      <div className={`text-sm font-bold tabular-nums mt-0.5 ${mono ? 'font-mono text-xs' : ''}`}>{value}</div>
     </div>
   )
 }

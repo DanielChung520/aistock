@@ -227,6 +227,33 @@ export const BACKTEST_SUMMARY_MD = `### 訓練摘要
 點下方「查看完整 config」可以看到訓練時用的所有參數。
 `
 
+export const BACKTEST_REWARD_MD = `### 訓練 Reward 曲線
+
+PPO 在每個 rollout 結束後記錄 \`ep_info_buffer\` 的平均 episode reward。
+
+- **上升趨勢**：agent 學到更好的策略 → reward 變正
+- **水平線**：reward 卡住，可能需要調 reward function 或 features
+- **劇烈震盪**：policy 還在探索，學習率可能太高
+- **垂直虛線**：walk-forward 各折的訓練結束點
+
+> 如果整條線都是負的（像初期 -76），代表 reward 函式（sharpe_like / risk_adjusted）的設計對 agent 來樣很難達成正值。這是正常的——重點是**最後 1/3 區段是否上升**。
+`
+
+export const BACKTEST_EQUITY_MD = `### Equity Curve（含交易標記）
+
+把整個回測區間的資金（equity）畫成時間序列：
+
+- **綠色三角形（▲）**：Buy 進場
+- **紅色三角形（▼）**：Sell 出場
+- **水平虛線**：基準線（1.0 = 完全沒賺沒賠）
+- **右上角文字**：總天數 + 交易次數
+
+**判讀**：
+- 交易次數少（1-4 次）+ 區間大賺 → hold 真的有效
+- 交易次數多（>10 次）+ 區間盤整 → agent 在主動高換手
+- 沒有交易標記 → 純 buy & hold（agent 學到 hold 是最佳）
+`
+
 export const EVAL_TABS_MD = `### Tabs 切換
 
 - **對照表**：4 個策略的關鍵指標 + 結論摘要（綠/紅 banner）
