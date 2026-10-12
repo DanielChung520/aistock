@@ -158,6 +158,8 @@ pub fn run() {
             wait_ready_then_navigate(app.handle().clone());
             Ok(())
         })
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
         .run(|app_handle: &tauri::AppHandle, event| {
             if let RunEvent::Exit = event {
                 if let Ok(mut guard) = app_handle.state::<OfflineProcesses>().0.lock() {
