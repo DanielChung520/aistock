@@ -9,6 +9,6 @@
     ]
   },
   "bundle": {
-    "resources": ["resources/arangodb/**"]
+    "resources": ["resources/arangodb/**/*"]
   }
 }
