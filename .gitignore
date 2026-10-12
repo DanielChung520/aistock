@@ -43,8 +43,11 @@ frontend/public/iframe
 .cache/
 .sisyphus/
 
-# Raw data files (large CSVs, model artifacts)
-data/
+# Raw data files (large CSVs, model artifacts) — 錨定路徑：不能忽略 backend/src/data/（Python 套件）
+/data/
+backend/data/
+backend/dist/
+backend/build/
 *.csv
 !frontend/**/*.csv
 
