@@ -228,6 +228,9 @@ jobs:
           # -L（dereference）：pnpm 的 standalone node_modules 是 symlink，
           # cp -r 只複製連結會斷鏈（styled-jsx/package.json 找不到）
           cp -rL "$SD/." src-tauri/resources/next/standalone/
+          # dereference 後 .pnpm store 已冗餘（頂層都是真目錄）；
+          # 其超長路徑（.pnpm/next@16.1.1_@babel+core@...）會讓 makensis 撞 MAX_PATH
+          rm -rf src-tauri/resources/next/standalone/node_modules/.pnpm
           find src-tauri/resources/backend -maxdepth 1 \( -name "*.exe" -o -name "_internal" \)
           find src-tauri/resources/next/standalone -maxdepth 1 -name server.js
           find src-tauri/resources/next/standalone/node -name node.exe
