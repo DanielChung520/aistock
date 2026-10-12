@@ -26,19 +26,8 @@ jobs:
           grep -v -E '^torch==|^stable-baselines3' requirements.txt > requirements-offline.txt
           pip install -r requirements-offline.txt
           pip install pyinstaller
-      - name: Diagnose src.data resolution
-        shell: bash
-        run: |
-          python - <<'PY'
-          import sys
-          sys.path.insert(0, '.')
-          import src, src.data, src.main
-          print('DIAG src =', src.__file__)
-          print('DIAG src.data =', src.data.__file__)
-          print('DIAG_OK')
-          PY
       - name: PyInstaller build
-        run: pyinstaller pyinstaller-offline.spec --noconfirm --clean --log-level DEBUG
+        run: pyinstaller pyinstaller-offline.spec --noconfirm --clean
       - name: Smoke test (arangod 3.11.14 + backend /health)
         shell: bash
         run: |
