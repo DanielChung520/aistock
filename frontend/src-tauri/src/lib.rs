@@ -158,7 +158,7 @@ pub fn run() {
             wait_ready_then_navigate(app.handle().clone());
             Ok(())
         })
-        .run(|app_handle, event| {
+        .run(|app_handle: &tauri::AppHandle, event| {
             if let RunEvent::Exit = event {
                 if let Ok(mut guard) = app_handle.state::<OfflineProcesses>().0.lock() {
                     for child in guard.iter_mut() {
