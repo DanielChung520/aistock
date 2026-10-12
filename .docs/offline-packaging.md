@@ -119,6 +119,8 @@ aistock-setup.exe (Tauri Rust shell)
 1. **M1（✅ 已交付）**：Phase 1 backend sidecar — `offline_entry.py` + `pyinstaller-offline.spec` + `build-offline.yml`（Windows CI 建置 + arangod 3.11.14 smoke `/health`；產物 252MB 無 torch）
 2. **M2（✅ 已交付）**：Phase 2 Next standalone + node — `next.config.ts output:'standalone'` + node.exe(v20) 打包 + CI smoke（`NEXT_SERVER_UP`，standalone 74MB + node 71MB）
 3. **M3（✅ 已交付）**：Phase 3 arangod 打包 — CI 將 `ArangoDB3-3.11.14_win64.zip` stage 進 `src-tauri/resources/arangodb/`，backend smoke 改用該份 arangod 並驗證**首啟建 `aistock` DB**；`tauri.offline.conf.json` 建置 + `package-offline` job 產出**含 arangod 的 installer（125MB）**。資源 glob 陷阱：Tauri 的 `**` 不 match 檔案，須用 `**/*`（官方 issue #2708）。
+4. **M4（✅ 已交付）**：Phase 4 Tauri 三程序編排 — `src-tauri/src/lib.rs` 啟動時偵測 resources（arangod/backend/node 全在 → 離線模式；不全 → 線上薄殼自動略過），spawn 三程序 + 就緒輪詢 + 導向 `127.0.0.1:33300` + Exit 清理；`tauri.offline.conf.json` 補 backend/next 資源；`build-offline.yml` package job 下載兩個 sidecar 進 resources + **E2E 全鏈 smoke**（Next proxy → backend → arangod watchlist）。
+5. **M5（✅ 已交付）**：完整三合一 installer — `aistock-offline-windows` artifact **743MB**（backend 251 + frontend 150 + arangod ~200 + Rust shell）。CI 迭代修的坑：pnpm trace 漏包（styled-jsx/@swc/@next 從 store 補）、upload-artifact 隱藏檔（`.next`/`.pnpm`，`include-hidden-files: true`）、`.pnpm` 超長路徑炸 makensis MAX_PATH（deref 後刪除）、Tauri v2 `.build(ctx).run(cb)` API。
 2. **M2**：Phase 2 Next standalone + node（CI 產出 + 本機/CI 起 server）
 3. **M3**：Phase 3 arangod 打包 + 首啟建 DB
 4. **M4**：Phase 4 Tauri 三程序編排 + 離線 config
