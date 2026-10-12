@@ -74,3 +74,67 @@ jobs:
         with:
           name: aistock-backend-sidecar
           path: backend/dist/aistock-backend/
+
+  frontend-sidecar:
+    name: Frontend Sidecar (Next standalone + node)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      - name: Next build (standalone)
+        run: pnpm run build
+      - name: Assemble standalone (static + public)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .next/standalone/.next/static .next/standalone/public
+          cp -r .next/static/. .next/standalone/.next/static/
+          cp -r public/. .next/standalone/public/
+          du -sh .next/standalone
+      - name: Bundle node runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          RT_WIN=$(printf '%s' "$RUNNER_TEMP" | tr '\\' '/')
+          RT_UNIX=$(cygpath -u "$RUNNER_TEMP")
+          curl -sL -o "$RT_WIN/node.zip" "https://nodejs.org/dist/v20.19.0/node-v20.19.0-win-x64.zip"
+          python -m zipfile -e "$RT_WIN/node.zip" "$RT_WIN"
+          mkdir -p .next/standalone/node
+          NODE_EXE=$(find "$RT_UNIX" -path '*node-v20*/node.exe' | head -1)
+          cp "$NODE_EXE" .next/standalone/node/node.exe
+          ls -la .next/standalone/node/
+      - name: Smoke test (node server.js → :33300)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd .next/standalone
+          export HOSTNAME=127.0.0.1 PORT=33300 BACKEND_URL=http://127.0.0.1:38000
+          ./node/node.exe server.js &
+          SRV_PID=$!
+          trap 'kill $SRV_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 40); do
+            if curl -s -o /tmp/idx.html "http://127.0.0.1:33300/"; then
+              echo "NEXT_SERVER_UP ($(wc -c < /tmp/idx.html) bytes)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "next :33300 timeout"
+          exit 1
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aistock-frontend-sidecar
+          path: frontend/.next/standalone/

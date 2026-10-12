@@ -2,6 +2,9 @@ import type { NextConfig } from 'next'
 import path from 'node:path'
 
 const nextConfig: NextConfig = {
+  // 離線自足版需要把 Next 當 standalone server 打包（.next/standalone），
+  // 由 node.exe 啟動；不影響既有部署（standalone 為加值產出）。
+  output: 'standalone',
   images: {
     remotePatterns: [
       {
