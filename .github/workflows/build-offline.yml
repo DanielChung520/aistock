@@ -161,6 +161,8 @@ jobs:
         with:
           name: aistock-frontend-sidecar
           path: frontend/.next/standalone/
+          # .next 是隱藏目錄，v4 預設不上傳隱藏檔 → standalone 會缺 BUILD_ID/server
+          include-hidden-files: true
 
   package-offline:
     name: Package Offline Installer (NSIS/MSI)
@@ -209,6 +211,8 @@ jobs:
         with:
           name: aistock-frontend-sidecar
           path: staging/frontend
+          # 解壓也要保留 .next（隱藏目錄）
+          include-hidden-files: true
       - name: Stage sidecars into resources
         shell: bash
         run: |
