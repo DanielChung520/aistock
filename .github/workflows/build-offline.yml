@@ -6,6 +6,8 @@ on:
     branches: [main]
     paths:
       - 'backend/**'
+      - 'frontend/src-tauri/**'
+      - 'frontend/next.config.ts'
       - '.github/workflows/build-offline.yml'
 
 jobs:
