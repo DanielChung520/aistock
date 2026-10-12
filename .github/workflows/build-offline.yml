@@ -112,6 +112,20 @@ jobs:
           cp -r .next/static/. .next/standalone/.next/static/
           cp -r public/. .next/standalone/public/
           du -sh .next/standalone
+      - name: Patch standalone (pnpm trace 漏包補齊)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # pnpm 的 standalone trace 會漏 styled-jsx/@swc/@next（執行期動態 require），
+          # 搬到無上層 node_modules 的離線環境會啟動失敗 → 從 pnpm store 補齊頂層
+          for mod in styled-jsx @swc @next; do
+            for d in node_modules/.pnpm/*/node_modules/$mod; do
+              [ -d "$d" ] || continue
+              mkdir -p ".next/standalone/node_modules/$(dirname "$mod")"
+              cp -rL "$d/." ".next/standalone/node_modules/$mod/"
+            done
+          done
+          ls -d .next/standalone/node_modules/styled-jsx .next/standalone/node_modules/@swc .next/standalone/node_modules/@next
       - name: Bundle node runtime
         shell: bash
         run: |
