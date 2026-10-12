@@ -116,7 +116,8 @@ aistock-setup.exe (Tauri Rust shell)
 
 ## 12. 里程碑（建議順序）
 
-1. **M1（✅ 已交付）**：Phase 1 backend sidecar — `offline_entry.py` + `pyinstaller-offline.spec` + `build-offline.yml`（Windows CI 建置 + arangod 3.11.14 smoke `/health`）
+1. **M1（✅ 已交付）**：Phase 1 backend sidecar — `offline_entry.py` + `pyinstaller-offline.spec` + `build-offline.yml`（Windows CI 建置 + arangod 3.11.14 smoke `/health`；產物 252MB 無 torch）
+2. **M2（✅ 已交付）**：Phase 2 Next standalone + node — `next.config.ts output:'standalone'` + node.exe(v20) 打包 + CI smoke（`NEXT_SERVER_UP`，standalone 74MB + node 71MB）
 2. **M2**：Phase 2 Next standalone + node（CI 產出 + 本機/CI 起 server）
 3. **M3**：Phase 3 arangod 打包 + 首啟建 DB
 4. **M4**：Phase 4 Tauri 三程序編排 + 離線 config
