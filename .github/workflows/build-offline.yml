@@ -203,8 +203,9 @@ jobs:
           BE=$(dirname "$(find ../staging/backend -name aistock-backend.exe | head -1)")
           mkdir -p src-tauri/resources/backend
           cp -r "$BE/." src-tauri/resources/backend/
-          # frontend standalone（內含 node/）→ src-tauri/resources/next/standalone/
-          SD=$(dirname "$(find ../staging/frontend -name server.js | head -1)")
+          # frontend standalone（artifact 根即 standalone，內含 node/）→ src-tauri/resources/next/standalone/
+          # 注意 -maxdepth 1：node_modules 內也有 server.js，不能全域找
+          SD=$(dirname "$(find ../staging/frontend -maxdepth 1 -name server.js | head -1)")
           mkdir -p src-tauri/resources/next
           cp -r "$SD/." src-tauri/resources/next/standalone/
           find src-tauri/resources/backend -maxdepth 1 \( -name "*.exe" -o -name "_internal" \)
