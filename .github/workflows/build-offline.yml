@@ -185,6 +185,72 @@ jobs:
           mkdir -p src-tauri/resources/arangodb
           python -m zipfile -e "$RT_WIN/arango.zip" src-tauri/resources/arangodb
           find src-tauri/resources/arangodb -name arangod.exe
+      - name: Download backend sidecar
+        uses: actions/download-artifact@v4
+        with:
+          name: aistock-backend-sidecar
+          path: staging/backend
+      - name: Download frontend sidecar
+        uses: actions/download-artifact@v4
+        with:
+          name: aistock-frontend-sidecar
+          path: staging/frontend
+      - name: Stage sidecars into resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          # backend onedir（dist/aistock-backend/）→ src-tauri/resources/backend/
+          BE=$(dirname "$(find ../staging/backend -name aistock-backend.exe | head -1)")
+          mkdir -p src-tauri/resources/backend
+          cp -r "$BE/." src-tauri/resources/backend/
+          # frontend standalone（內含 node/）→ src-tauri/resources/next/standalone/
+          SD=$(dirname "$(find ../staging/frontend -name server.js | head -1)")
+          mkdir -p src-tauri/resources/next
+          cp -r "$SD/." src-tauri/resources/next/standalone/
+          find src-tauri/resources/backend -maxdepth 1 \( -name "*.exe" -o -name "_internal" \)
+          find src-tauri/resources/next/standalone -maxdepth 1 -name server.js
+          find src-tauri/resources/next/standalone/node -name node.exe
+      - name: E2E smoke (三程序全鏈：Next → backend → arangod)
+        shell: bash
+        run: |
+          set -euo pipefail
+          RT_WIN=$(printf '%s' "$RUNNER_TEMP" | tr '\\' '/')
+          RT_UNIX=$(cygpath -u "$RUNNER_TEMP")
+          RES=src-tauri/resources
+          ARANGO_BIN_UNIX=$(find "$RES/arangodb" -name arangod.exe | head -1)
+          ARANGO_BIN=$(cygpath -w "$ARANGO_BIN_UNIX")
+          JS_DIR=$(cygpath -w "$(find "$RES/arangodb" -type d -path '*share/arangodb3/js' | head -1)")
+          mkdir -p "$RT_WIN/e2e-data" "$RT_WIN/e2e-apps"
+          "$ARANGO_BIN" --server.endpoint tcp://127.0.0.1:8530 \
+            --database.directory "$RT_WIN/e2e-data" \
+            --server.authentication false \
+            --javascript.startup-directory "$JS_DIR" \
+            --javascript.app-path "$RT_WIN/e2e-apps" &
+          ARANGO_PID=$!
+          "$RES/backend/aistock-backend.exe" --host 127.0.0.1 --port 38000 &
+          BACKEND_PID=$!
+          (cd "$RES/next/standalone" && HOSTNAME=127.0.0.1 PORT=33300 BACKEND_URL=http://127.0.0.1:38000 ./node/node.exe server.js) &
+          NODE_PID=$!
+          trap 'kill ${ARANGO_PID:-} ${BACKEND_PID:-} ${NODE_PID:-} 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:38000/health >/dev/null 2>&1 \
+              && curl -sf -o /dev/null http://127.0.0.1:33300/ 2>&1; then
+              echo "ALL_UP"
+              break
+            fi
+            sleep 2
+          done
+          # 全鏈驗證：Next proxy → backend → arangod（watchlist 只讀 DB，確定性）
+          code=$(curl -s -o /tmp/wl.json -w "%{http_code}" "http://127.0.0.1:33300/api/watchlist")
+          echo "CHAIN_STATUS=$code"
+          head -c 200 /tmp/wl.json; echo
+          if [ "$code" = "200" ] \
+            && curl -sf "http://127.0.0.1:8530/_api/database" | grep -q '"aistock"'; then
+            echo "E2E_OFFLINE_OK"
+            exit 0
+          fi
+          echo "E2E_OFFLINE_FAIL"
+          exit 1
       - name: Tauri build (offline config)
         shell: bash
         run: |
