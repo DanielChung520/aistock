@@ -82,3 +82,6 @@ step6-save-model-page.yml
 job-reloaded.yml
 full-snapshot.md
 ai-training-list.yml
+
+# 離線版 build 產物（CI 產生）
+frontend/src-tauri/resources/

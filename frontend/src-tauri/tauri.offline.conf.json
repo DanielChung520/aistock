@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "url": "http://127.0.0.1:33300",
+        "title": "EEA - My AI Stock | 台股分析平台（離線版）"
+      }
+    ]
+  },
+  "bundle": {
+    "resources": ["resources/arangodb/**"]
+  }
+}

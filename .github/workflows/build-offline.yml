@@ -28,24 +28,25 @@ jobs:
           pip install pyinstaller
       - name: PyInstaller build
         run: pyinstaller pyinstaller-offline.spec --noconfirm --clean
-      - name: Smoke test (arangod 3.11.14 + backend /health)
+      - name: Stage arangod → resources + smoke (backend /health + aistock DB 首啟)
         shell: bash
         run: |
           set -euo pipefail
-          # GNU tar 會把 `D:` 當成遠端 host，故解壓用 python；路徑分兩版：
-          #   RT_WIN  (D:/...) 給 python 與原生 exe（arangod.exe）
-          #   RT_UNIX (/d/...) 給 bash 工具（find）
+          # 路徑分兩版：RT_WIN(D:/...) 給 python/原生 exe；RT_UNIX(/d/...) 給 bash 工具。
+          # GNU tar 會把 D: 當遠端 host → 解壓一律用 python -m zipfile。
           RT_WIN=$(printf '%s' "$RUNNER_TEMP" | tr '\\' '/')
           RT_UNIX=$(cygpath -u "$RUNNER_TEMP")
           # ArangoDB 3.12+ 不再出 Windows 套件，3.11.14 是最後一版（EOL，僅離線版使用）
           curl -sL -o "$RT_WIN/arango.zip" \
             "https://download.arangodb.com/arangodb311/Community/Windows/ArangoDB3-3.11.14_win64.zip"
-          python -m zipfile -e "$RT_WIN/arango.zip" "$RT_WIN"
-          ARANGO_BIN_UNIX=$(find "$RT_UNIX" -name arangod.exe | head -1)
+          mkdir -p ../frontend/src-tauri/resources/arangodb
+          RES_UNIX=$(cd ../frontend/src-tauri/resources/arangodb && pwd)
+          python -m zipfile -e "$RT_WIN/arango.zip" "$RES_UNIX"
+          ARANGO_BIN_UNIX=$(find "$RES_UNIX" -name arangod.exe | head -1)
           ARANGO_BIN=$(cygpath -w "$ARANGO_BIN_UNIX")
-          # Windows zip 的 js 目錄在 <root>/usr/share/arangodb3/js，動態找避免硬編
-          JS_DIR_UNIX=$(find "$RT_UNIX" -type d -path "*share/arangodb3/js" | head -1)
-          JS_DIR=$(cygpath -w "$JS_DIR_UNIX")
+          # Windows zip 的 js 在 <root>/usr/share/arangodb3/js
+          JS_DIR=$(cygpath -w "$(find "$RES_UNIX" -type d -path '*share/arangodb3/js' | head -1)")
+          echo "arangod staged: $ARANGO_BIN_UNIX"
           mkdir -p "$RT_WIN/arango-data" "$RT_WIN/arango-apps"
           "$ARANGO_BIN" --server.endpoint tcp://127.0.0.1:8530 \
             --database.directory "$RT_WIN/arango-data" \
@@ -63,11 +64,17 @@ jobs:
           for i in $(seq 1 60); do
             if curl -sf "http://127.0.0.1:38000/health"; then
               echo "BACKEND_HEALTH_OK"
-              exit 0
+              break
             fi
             sleep 2
           done
-          echo "backend /health timeout"
+          # 首啟建 DB 驗證：backend lifespan 的 ensure_database() 應已在全新 arangod 建出 aistock DB
+          if curl -sf "http://127.0.0.1:38000/health" \
+            && curl -sf "http://127.0.0.1:8530/_api/database" | grep -q '"aistock"'; then
+            echo "DB_AISTOCK_CREATED_OK"
+            exit 0
+          fi
+          echo "FAIL: /health 或 aistock DB 未建立"
           exit 1
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -138,3 +145,55 @@ jobs:
         with:
           name: aistock-frontend-sidecar
           path: frontend/.next/standalone/
+
+  package-offline:
+    name: Package Offline Installer (NSIS/MSI)
+    runs-on: windows-latest
+    needs: [backend-sidecar, frontend-sidecar]
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - name: Install pnpm deps (tauri CLI)
+        run: pnpm install --frozen-lockfile
+      - name: Create frontendDist placeholder
+        shell: bash
+        run: |
+          mkdir -p .placeholder
+          printf '<!doctype html><meta charset="utf-8"><title>EEA</title>\n' > .placeholder/index.html
+      - name: Stage arangod into resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          RT_WIN=$(printf '%s' "$RUNNER_TEMP" | tr '\\' '/')
+          curl -sL -o "$RT_WIN/arango.zip" \
+            "https://download.arangodb.com/arangodb311/Community/Windows/ArangoDB3-3.11.14_win64.zip"
+          mkdir -p src-tauri/resources/arangodb
+          python -m zipfile -e "$RT_WIN/arango.zip" src-tauri/resources/arangodb
+          find src-tauri/resources/arangodb -name arangod.exe
+      - name: Tauri build (offline config)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CFG=$(printf '%s/frontend/src-tauri/tauri.offline.conf.json' "$GITHUB_WORKSPACE" | tr '\\' '/')
+          pnpm tauri build --config "$CFG" --bundles nsis,msi
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: aistock-offline-windows
+          path: |
+            frontend/src-tauri/target/release/bundle/nsis/*.exe
+            frontend/src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error
