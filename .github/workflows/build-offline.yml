@@ -207,7 +207,9 @@ jobs:
           # 注意 -maxdepth 1：node_modules 內也有 server.js，不能全域找
           SD=$(dirname "$(find ../staging/frontend -maxdepth 1 -name server.js | head -1)")
           mkdir -p src-tauri/resources/next
-          cp -r "$SD/." src-tauri/resources/next/standalone/
+          # -L（dereference）：pnpm 的 standalone node_modules 是 symlink，
+          # cp -r 只複製連結會斷鏈（styled-jsx/package.json 找不到）
+          cp -rL "$SD/." src-tauri/resources/next/standalone/
           find src-tauri/resources/backend -maxdepth 1 \( -name "*.exe" -o -name "_internal" \)
           find src-tauri/resources/next/standalone -maxdepth 1 -name server.js
           find src-tauri/resources/next/standalone/node -name node.exe
