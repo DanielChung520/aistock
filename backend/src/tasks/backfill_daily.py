@@ -32,6 +32,18 @@ def _suffix(stock_id: str) -> str:
 
 
 def _fetch_daily(symbol: str, start: str, end: str) -> list[dict]:
+    try:
+        from src import fubon_market
+
+        records = fubon_market.fetch_daily(symbol, start, end)
+        if records:
+            return records
+    except fubon_market.FubonUnavailable as exc:
+        logger.warning("Fubon backfill unavailable for %s (%s); using yfinance", symbol, exc)
+    return _fetch_daily_yfinance(symbol, start, end)
+
+
+def _fetch_daily_yfinance(symbol: str, start: str, end: str) -> list[dict]:
     # yfinance probes sys.stdout.readable(), which Celery replaces with a
     # LoggingProxy that has no readable() — silence stdout while fetching.
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):

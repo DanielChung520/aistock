@@ -85,3 +85,13 @@ ai-training-list.yml
 
 # 離線版 build 產物（CI 產生）
 frontend/src-tauri/resources/
+
+# 券商 SDK（sdk/）— 憑證與下載安裝檔絕不入版控（見 sdk/README.md）
+# 忽略目錄內容但保留目錄結構（.gitkeep 可入版控）
+sdk/**/certs/*
+sdk/**/wheels/*
+!sdk/**/certs/.gitkeep
+!sdk/**/wheels/.gitkeep
+*.pfx
+*.p12
+*.pem

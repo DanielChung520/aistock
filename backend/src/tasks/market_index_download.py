@@ -86,8 +86,23 @@ def _enabled_indices() -> list[dict]:
     return list(cursor)
 
 
-def _fetch_index_rows(yf_symbol: str, start: date, end: date) -> list[dict]:
-    """Fetch daily OHLCV rows for an index via yfinance."""
+# TW indices that Fubon serves; foreign indices stay on yfinance (not offered).
+FUBON_INDEX_MAP = {"TWII": "IX0001", "TWO": "IX0043"}
+
+
+def _fetch_index_rows(symbol: str, yf_symbol: str, start: date, end: date) -> list[dict]:
+    """Fetch daily OHLCV rows: Fubon for TW indices, yfinance otherwise."""
+    fubon_symbol = FUBON_INDEX_MAP.get(symbol)
+    if fubon_symbol:
+        try:
+            from src import fubon_market
+
+            rows = fubon_market.fetch_daily(fubon_symbol, start.isoformat(), end.isoformat())
+            if rows:
+                return rows
+        except fubon_market.FubonUnavailable as exc:
+            logger.warning("Fubon index %s unavailable (%s); using yfinance", symbol, exc)
+
     import yfinance as yf
 
     ticker = yf.Ticker(yf_symbol)
@@ -161,7 +176,7 @@ def _run_index_job(days: int) -> dict:
         yf_symbol = idx.get("yfSymbol") or symbol
         name = idx.get("name") or symbol
         try:
-            rows = _fetch_index_rows(yf_symbol, start, end)
+            rows = _fetch_index_rows(symbol, yf_symbol, start, end)
             written = _upsert_index_rows(symbol, name, yf_symbol, rows)
             results.append({"symbol": symbol, "written": written})
             logger.info("market_index %s: written=%s", symbol, written)

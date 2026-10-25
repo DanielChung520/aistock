@@ -62,50 +62,77 @@ def _suffix(stock_id: str) -> str:
 
 # ── OHLCV + O1/C1 ─────────────────────────────────────────────
 
-def _fetch_ohlcv_incremental(stock_id: str) -> tuple[list[dict], dict[str, dict]]:
-    """Fetch recent daily OHLCV (last 5d) and O1/C1 (last 2y window)."""
+def _o1c1_from_minute_rows(minute_rows: list[dict]) -> dict[str, dict]:
+    """O1 = close of the 09:00 60m bar (= 10:00 price); C1 = close of the 12:00 bar (= 13:00)."""
+    o1c1: dict[str, dict] = {}
+    for row in minute_rows:
+        day, _, clock = str(row["date"]).partition(" ")
+        if clock.startswith("09:00"):
+            o1c1.setdefault(day, {})["o1"] = row["close"]
+        elif clock.startswith("12:00"):
+            o1c1.setdefault(day, {})["c1"] = row["close"]
+    return o1c1
+
+
+def _fetch_ohlcv_yfinance(stock_id: str) -> tuple[list[dict], list[dict]]:
     import yfinance as yf
 
     ticker = f"{stock_id}{_suffix(stock_id)}"
 
-    # Daily OHLCV — last 10 days (dedupes; only missing dates are written)
     daily_df = yf.Ticker(ticker).history(period="10d", auto_adjust=False)
     daily_rows: list[dict] = []
-    if not daily_df.empty:
-        for dt, r in daily_df.iterrows():
-            try:
-                c = float(r["Close"])
-                if c != c:
-                    continue
-                daily_rows.append({
-                    "date": dt.strftime("%Y-%m-%d"),
-                    "open": round(float(r["Open"]), 2),
-                    "high": round(float(r["High"]), 2),
-                    "low": round(float(r["Low"]), 2),
-                    "close": round(c, 2),
-                    "volume": int(r["Volume"]),
-                })
-            except Exception:
+    for dt, r in daily_df.iterrows():
+        try:
+            c = float(r["Close"])
+            if c != c:
                 continue
+            daily_rows.append({
+                "date": dt.strftime("%Y-%m-%d"),
+                "open": round(float(r["Open"]), 2),
+                "high": round(float(r["High"]), 2),
+                "low": round(float(r["Low"]), 2),
+                "close": round(c, 2),
+                "volume": int(r["Volume"]),
+            })
+        except Exception:
+            continue
 
-    # O1/C1 — 2y window via 60m (O1=10:00 price, C1=13:00 price)
-    o1c1: dict[str, dict] = {}
     minute_df = yf.Ticker(ticker).history(period="2y", interval="60m", auto_adjust=False)
-    if not minute_df.empty:
-        for dt, r in minute_df.iterrows():
-            try:
-                h, m = dt.hour, dt.minute
-                c = float(r["Close"])
-                if c != c:
-                    continue
-                dstr = dt.strftime("%Y-%m-%d")
-                if h == 9 and m == 0:
-                    o1c1.setdefault(dstr, {})["o1"] = round(c, 2)
-                elif h == 12 and m == 0:
-                    o1c1.setdefault(dstr, {})["c1"] = round(c, 2)
-            except Exception:
+    minute_rows: list[dict] = []
+    for dt, r in minute_df.iterrows():
+        try:
+            c = float(r["Close"])
+            if c != c:
                 continue
-    return daily_rows, o1c1
+            minute_rows.append({"date": dt.strftime("%Y-%m-%d %H:%M:%S"), "close": round(c, 2)})
+        except Exception:
+            continue
+    return daily_rows, minute_rows
+
+
+def _fetch_ohlcv_incremental(stock_id: str) -> tuple[list[dict], dict[str, dict]]:
+    """Fetch recent daily OHLCV (last 5d) and O1/C1 (last 2y window)."""
+    end = date.today()
+    daily_rows: list[dict] = []
+    minute_rows: list[dict] = []
+    try:
+        from src import fubon_market
+
+        daily_rows = fubon_market.fetch_daily(
+            stock_id, (end - timedelta(days=10)).isoformat(), end.isoformat()
+        )
+        minute_rows = fubon_market.fetch_candles(
+            stock_id, "60", (end - timedelta(days=O1C1_WINDOW_DAYS)).isoformat(), end.isoformat()
+        )
+    except fubon_market.FubonUnavailable as exc:
+        logger.warning("Fubon research data unavailable for %s (%s); using yfinance", stock_id, exc)
+
+    if not daily_rows or not minute_rows:
+        yf_daily, yf_minute = _fetch_ohlcv_yfinance(stock_id)
+        daily_rows = daily_rows or yf_daily
+        minute_rows = minute_rows or yf_minute
+
+    return daily_rows, _o1c1_from_minute_rows(minute_rows)
 
 
 def _upsert_daily(stock_id: str, daily_rows: list[dict], o1c1: dict[str, dict]) -> dict:

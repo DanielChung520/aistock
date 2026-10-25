@@ -1,3 +1,4 @@
+import logging
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 
@@ -6,6 +7,8 @@ import yfinance as yf
 from arango.exceptions import ArangoError
 
 from src.db import get_db
+
+logger = logging.getLogger(__name__)
 
 DAILY_COLLECTION = "stock_daily"
 MINUTE_COLLECTION = "stock_minute_1m"
@@ -158,6 +161,64 @@ def store_minute_15m(symbol: str, records: list[dict]) -> None:
         _store_minute(symbol, records, collection=MINUTE_15M_COLLECTION)
 
 
+# ── Source adapters: Fubon first, yfinance fallback ───────────
+
+def _fubon_daily(symbol: str, start: str, end: str) -> list[dict] | None:
+    """Daily bars from Fubon; None means yfinance fallback."""
+    try:
+        from src import fubon_market
+
+        records = fubon_market.fetch_daily(symbol, start, end)
+        return records or None
+    except fubon_market.FubonUnavailable as exc:
+        logger.warning("Fubon daily unavailable for %s (%s); using yfinance", symbol, exc)
+        return None
+
+
+def _fubon_minute(symbol: str, timeframe: str, start: str, end: str) -> list[dict] | None:
+    """Minute bars from Fubon (with a `datetime` key); None means yfinance fallback."""
+    try:
+        from src import fubon_market
+
+        records = fubon_market.fetch_candles(symbol, timeframe, start, end)
+        if not records:
+            return None
+        return [
+            {
+                "datetime": r["date"],
+                "open": r["open"],
+                "high": r["high"],
+                "low": r["low"],
+                "close": r["close"],
+                "volume": r["volume"],
+            }
+            for r in records
+        ]
+    except fubon_market.FubonUnavailable as exc:
+        logger.warning("Fubon %sm unavailable for %s (%s); using yfinance", timeframe, symbol, exc)
+        return None
+
+
+def _yf_daily_records(symbol: str, start: str, end: str) -> list[dict]:
+    ticker = yf.Ticker(_twse_symbol(symbol))
+    # auto_adjust=False keeps RAW prices consistent with Fubon and the bulk backfill.
+    hist = ticker.history(start=start, end=end, auto_adjust=False)
+    records: list[dict] = []
+    for dt, row in hist.iterrows():
+        close_val = float(row["Close"])
+        if close_val != close_val:
+            continue
+        records.append({
+            "date": _parse_yfinance_index(dt),
+            "open": round(float(row["Open"]), 2),
+            "high": round(float(row["High"]), 2),
+            "low": round(float(row["Low"]), 2),
+            "close": round(close_val, 2),
+            "volume": int(row["Volume"]),
+        })
+    return records
+
+
 # ── Daily history ─────────────────────────────────────────────
 
 def fetch_daily_history(
@@ -187,28 +248,12 @@ def fetch_daily_history(
         if latest >= (date.today() - timedelta(days=1)).isoformat():
             return cached
 
-    # Fallback to yfinance, then store
-    ticker = yf.Ticker(_twse_symbol(symbol))
-    # auto_adjust=False keeps RAW (actual traded) prices consistent with the
-    # bulk backfill (backfill_daily.py) and 60m o1/c1; the yfinance default
-    # (True) back-adjusts dividends, mixing scales inside stock_daily.
-    hist = ticker.history(start=start.isoformat(), end=end.isoformat(), auto_adjust=False)
-    if hist.empty:
+    # Prefer Fubon; fall back to yfinance only when Fubon is unavailable.
+    records = _fubon_daily(symbol, start.isoformat(), end.isoformat())
+    if records is None:
+        records = _yf_daily_records(symbol, start.isoformat(), end.isoformat())
+    if not records:
         return cached if cached else []
-
-    records = []
-    for dt, row in hist.iterrows():
-        close_val = float(row["Close"])
-        if close_val != close_val:
-            continue
-        records.append({
-            "date": _parse_yfinance_index(dt),
-            "open": round(float(row["Open"]), 2),
-            "high": round(float(row["High"]), 2),
-            "low": round(float(row["Low"]), 2),
-            "close": round(close_val, 2),
-            "volume": int(row["Volume"]),
-        })
 
     # Merge with cached (avoid duplicates), keeping strict ascending date order
     cached_dates = {r["date"] for r in cached}
@@ -248,17 +293,18 @@ def fetch_minute_history(
     cached_1m = list(cursor)
 
     if not cached_1m or (cached_1m and cached_1m[-1]["datetime"] < (datetime.now() - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")):
-        # Fallback to yfinance for 1m data, then store
-        ticker = yf.Ticker(_twse_symbol(symbol))
-        period = f"{min(days, 7)}d"  # yfinance max for 1m is 7 days
-        hist = ticker.history(period=period, interval="1m")
-        if not hist.empty:
-            yf_records = []
+        # Prefer Fubon 1m; fall back to yfinance (max 7 days for interval="1m").
+        fresh = _fubon_minute(symbol, "1", start_str, end.isoformat())
+        if fresh is None:
+            ticker = yf.Ticker(_twse_symbol(symbol))
+            period = f"{min(days, 7)}d"
+            hist = ticker.history(period=period, interval="1m")
+            fresh = []
             for dt, row in hist.iterrows():
                 close_val = float(row["Close"])
                 if close_val != close_val:
                     continue
-                yf_records.append({
+                fresh.append({
                     "datetime": dt.strftime("%Y-%m-%d %H:%M:%S"),
                     "open": round(float(row["Open"]), 2),
                     "high": round(float(row["High"]), 2),
@@ -267,12 +313,12 @@ def fetch_minute_history(
                     "volume": int(row["Volume"]),
                 })
 
+        if fresh:
             cached_dts = {r["datetime"] for r in cached_1m}
-            new_records = [r for r in yf_records if r["datetime"] not in cached_dts]
+            new_records = [r for r in fresh if r["datetime"] not in cached_dts]
             if new_records:
                 _store_minute(symbol, new_records)
-
-            cached_1m = _merge_sorted(cached_1m, yf_records, "datetime")
+            cached_1m = _merge_sorted(cached_1m, fresh, "datetime")
 
     # Aggregate from 1m to requested interval
     if interval == "1m":
@@ -348,38 +394,35 @@ def fetch_15m_history(symbol: str, days: int = YF_15M_MAX_DAYS) -> list[dict]:
     if cached and cached[-1]["datetime"] >= stale_before:
         return cached
 
-    ticker = yf.Ticker(_yf_symbol(symbol))
-    hist = ticker.history(
-        start=start_str,
-        end=(date.today() + timedelta(days=1)).isoformat(),
-        interval="15m",
-        auto_adjust=False,
-    )
-    if hist.empty:
-        return cached
+    # Prefer Fubon 15m; fall back to yfinance (interval="15m").
+    end_str = (date.today() + timedelta(days=1)).isoformat()
+    yf_records = _fubon_minute(symbol, "15", start_str, end_str)
+    if yf_records is None:
+        ticker = yf.Ticker(_yf_symbol(symbol))
+        hist = ticker.history(start=start_str, end=end_str, interval="15m", auto_adjust=False)
+        yf_records = []
+        for dt, row in hist.iterrows():
+            close_val = float(row["Close"])
+            if close_val != close_val:
+                continue
+            yf_records.append({
+                "datetime": dt.strftime("%Y-%m-%d %H:%M:%S"),
+                "open": round(float(row["Open"]), 2),
+                "high": round(float(row["High"]), 2),
+                "low": round(float(row["Low"]), 2),
+                "close": round(close_val, 2),
+                "volume": int(row["Volume"]),
+            })
 
-    yf_records = []
-    for dt, row in hist.iterrows():
-        close_val = float(row["Close"])
-        if close_val != close_val:
-            continue
-        yf_records.append({
-            "datetime": dt.strftime("%Y-%m-%d %H:%M:%S"),
-            "open": round(float(row["Open"]), 2),
-            "high": round(float(row["High"]), 2),
-            "low": round(float(row["Low"]), 2),
-            "close": round(close_val, 2),
-            "volume": int(row["Volume"]),
-        })
+    if not yf_records:
+        return cached
 
     cached_dts = {r["datetime"] for r in cached}
     new_records = [r for r in yf_records if r["datetime"] not in cached_dts]
     if new_records:
         store_minute_15m(symbol, new_records)
 
-    merged = list(cached)
-    merged.extend(new_records)
-    return merged
+    return _merge_sorted(cached, yf_records, "datetime")
 
 
 # ── History cleanup (for scheduled maintenance tasks) ─────────
