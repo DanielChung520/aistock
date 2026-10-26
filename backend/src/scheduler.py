@@ -207,6 +207,14 @@ def execute_job(job: dict) -> int | None:
         retain = int(params.get("retain_seconds") or 30 * 86400)
         return cleanup_expired_hits(retain_seconds=retain)
 
+    if job_type == "strategy_screen":
+        from src.routers.strategy import run_strategy
+        strategy_id = str(params.get("strategy_id") or "")
+        if not strategy_id:
+            raise ValueError("strategy_screen job requires params.strategy_id")
+        run_strategy(strategy_id, scope=str(params.get("scope") or "all"), source="scheduled")
+        return None
+
     raise ValueError(f"unknown job type: {job_type}")
 
 

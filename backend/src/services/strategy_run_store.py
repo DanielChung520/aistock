@@ -25,6 +25,7 @@ _META_FIELDS = (
     "source",
     "executed_at",
     "count",
+    "action",
 )
 
 
@@ -42,6 +43,7 @@ def _meta(row: dict) -> dict:
         "source": row.get("source", "manual"),
         "executed_at": row.get("executed_at"),
         "count": int(row.get("count", 0) or 0),
+        "action": row.get("action", "") or "",
     }
 
 
@@ -53,6 +55,7 @@ def create_run(
     scope: str,
     source: str,
     hits: list[dict],
+    action: str = "",
 ) -> dict:
     ensure_runs()
     col = get_db().collection(COLLECTION)
@@ -77,6 +80,7 @@ def create_run(
         "source": source,
         "executed_at": datetime.now(timezone.utc).timestamp(),
         "count": len(compact),
+        "action": action,
         "hits": compact,
     }
     col.insert(doc)
@@ -104,3 +108,30 @@ def get_run(key: str) -> dict | None:
         return None
     row = col.get(key)
     return {**_meta(row), "hits": row.get("hits", [])}
+
+
+def update_run_action(key: str, action: str) -> dict | None:
+    """Set the round-2 follow-up `action` on a run. Returns the run, or None if absent."""
+    col = get_db().collection(COLLECTION)
+    if not col.has(key):
+        return None
+    col.update({"_key": key, "action": action})
+    return get_run(key)
+
+
+def delete_run(key: str) -> bool:
+    """Delete one run. Returns False when the key does not exist."""
+    col = get_db().collection(COLLECTION)
+    if not col.has(key):
+        return False
+    col.delete(key)
+    return True
+
+
+def delete_all_runs() -> int:
+    """Delete every run. Returns the deleted count (0 on an empty collection)."""
+    ensure_runs()
+    cursor = get_db().aql.execute(
+        "FOR r IN strategy_runs REMOVE r IN strategy_runs RETURN OLD",
+    )
+    return len(list(cursor))

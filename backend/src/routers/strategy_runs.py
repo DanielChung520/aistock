@@ -44,3 +44,15 @@ def get_run(key: str) -> dict:
     if run is None:
         raise HTTPException(status_code=404, detail=f"run not found: {key}")
     return run
+
+
+@router.delete("")
+def delete_all_runs() -> dict:
+    return {"deleted": strategy_run_store.delete_all_runs()}
+
+
+@router.delete("/{key}")
+def delete_run(key: str) -> dict:
+    if not strategy_run_store.delete_run(key):
+        raise HTTPException(status_code=404, detail=f"run not found: {key}")
+    return {"id": key, "deleted": True}

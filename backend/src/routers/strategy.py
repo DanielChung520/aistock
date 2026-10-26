@@ -277,6 +277,32 @@ def _scan(
     return results[:limit], len(stock_ids)
 
 
+def run_strategy(
+    strategy_id: str,
+    *,
+    scope: str = "all",
+    source: str = "scheduled",
+    limit: int = 5000,
+) -> dict:
+    """Run a saved strategy over the universe and persist an execution record."""
+    from src.services import strategy_run_store, strategy_store
+
+    strategy = strategy_store.get_strategy(strategy_id)
+    if strategy is None:
+        raise ValueError(f"strategy not found: {strategy_id}")
+    conditions = _validate_conditions(strategy.get("conditions", []))
+    stock_ids_map = _resolve_scope(get_db(), scope) if scope != "all" else None
+    results, _ = _scan(conditions, limit, stock_ids_map)
+    return strategy_run_store.create_run(
+        strategy_id=strategy_id,
+        strategy_name=strategy.get("name", ""),
+        conditions=conditions,
+        scope=scope,
+        source=source,
+        hits=results,
+    )
+
+
 def _manual_conditions(
     ma_bull: bool,
     ma_slope: bool,
