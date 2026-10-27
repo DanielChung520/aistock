@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.db import ensure_collection, ensure_database, get_db
 from src.data_fetcher import DAILY_COLLECTION, MINUTE_COLLECTION, VP_COLLECTION
 from src.scheduler import start_scheduler, stop_scheduler
+from src.routers.accounting import router as accounting_router
 from src.routers.auction import router as auction_router
 from src.routers.backtest import router as backtest_router
 from src.routers.bars import router as bars_router
@@ -119,6 +120,7 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+app.include_router(accounting_router, prefix="/api")
 app.include_router(stocks_router, prefix="/api")
 app.include_router(bars_router, prefix="/api")
 app.include_router(schedule_router, prefix="/api")
