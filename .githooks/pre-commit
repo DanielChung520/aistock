@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────────────────────
+# pre-commit — 文件同步守門（Documentation Discipline）
+#
+# 規則（見 AGENTS.md「Documentation Discipline 文件同步規範」）：
+#   任何建立或修改「程式碼」的 commit，必須同時新增或更新「文件」。
+#   偵測到程式碼變更、卻沒有任何文件變更時 → 阻擋 commit。
+#
+# 略過（緊急用，須在 commit message 說明原因）：
+#   DOC_SYNC_BYPASS=1 git commit ...
+#
+# 啟用（每個 clone 各做一次）：
+#   git config core.hooksPath .githooks
+# ─────────────────────────────────────────────────────────────────────────────
+set -uo pipefail
+
+if [ "${DOC_SYNC_BYPASS:-0}" = "1" ]; then
+  echo "[doc-sync] 已透過 DOC_SYNC_BYPASS=1 略過文件同步檢查"
+  exit 0
+fi
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$staged" ] && exit 0
+
+# 程式碼：實際邏輯所在之處
+code=$(printf '%s\n' "$staged" | grep -E '^(backend/src/|frontend/src/|backend/scripts/|frontend/scripts/|airflow/|scripts/|sdk/)' || true)
+# 文件：.docs/ 底下，或任何 markdown
+docs=$(printf '%s\n' "$staged" | grep -E '(^\.docs/|\.md$)' || true)
+
+if [ -n "$code" ] && [ -z "$docs" ]; then
+  cat >&2 <<'EOF'
+[doc-sync] ✗ 偵測到程式碼變更，但沒有任何文件變更。
+
+本 repo 規範：任何建立/修改程式碼的 commit，必須同時新增或更新文件
+（.docs/** 或任何 *.md；慣例：需求用 .docs/requirement-*.md、子系統用 .docs/<subsystem>/）。
+
+請擇一：
+  1) 新增/更新對應文件後再 commit（建議）
+  2) 若確實無需文件（純重構/格式/typo），以 DOC_SYNC_BYPASS=1 git commit ... 略過，
+     並在 commit message 說明原因
+
+待提交的程式碼檔案：
+EOF
+  printf '%s\n' "$code" | sed 's/^/    /' >&2
+  exit 1
+fi
+
+exit 0

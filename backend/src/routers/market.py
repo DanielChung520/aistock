@@ -1,9 +1,12 @@
+import logging
 import ssl
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import httpx
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
+from starlette.concurrency import run_in_threadpool
 
+from src import fubon_market
 from src.indicators import (
     calculate_bollinger,
     calculate_kdj,
@@ -14,6 +17,8 @@ from src.indicators import (
 )
 
 router = APIRouter(prefix="/market", tags=["market"])
+
+logger = logging.getLogger(__name__)
 
 # TWSE 的 SSL 憑證缺少 Subject Key Identifier，Python 3.14+ 預設會拒絕
 # 建立寬鬆的 SSL context 來繞過此問題
@@ -201,5 +206,152 @@ async def get_taiex_indicators(
         "rsi": calculate_rsi(dates, closes, rsi_period),
         "macd": calculate_macd(dates, closes, macd_fast, macd_slow, macd_signal),
         "bollinger": calculate_bollinger(dates, closes, bb_period, bb_std),
+        "ma_accuracy": calculate_signal_accuracy(ma_all, highs, lows, closes),
+    }
+
+
+# 指數分K 一律走富邦 IX0001（TSE 加權指數）：historical.candles 的 timeframe
+# 支援 "10"，而 yfinance 無 10m 原生解析度；富邦不可用時回傳空陣列（前端顯示暫無資料）。
+TAIEX_INDEX_SYMBOL = "IX0001"
+VALID_INDEX_RESOLUTIONS = ("1", "5", "10", "15", "30", "60")
+VALID_INDEX_INTERVALS = ("1m", "5m", "10m", "15m", "30m", "60m")
+
+_TAIEX_INTRADAY_CACHE_TTL_SECONDS = 60
+_taiex_intraday_cache: dict[tuple[str, int], dict[str, object]] = {}
+
+
+def _fetch_taiex_intraday_sync(resolution: str, days: int) -> list[dict[str, object]]:
+    end = date.today()
+    start = end - timedelta(days=days)
+    records = fubon_market.fetch_candles(
+        TAIEX_INDEX_SYMBOL, resolution, start.isoformat(), end.isoformat()
+    )
+    return [
+        {
+            "date": str(r["date"]),
+            "open": float(r["open"]),
+            "high": float(r["high"]),
+            "low": float(r["low"]),
+            "close": float(r["close"]),
+            "volume": int(r.get("volume") or 0),
+        }
+        for r in records
+    ]
+
+
+async def _get_taiex_intraday(resolution: str, days: int) -> list[dict[str, object]]:
+    key = (resolution, days)
+    entry = _taiex_intraday_cache.get(key)
+    if entry:
+        cached_at_raw = entry.get("cached_at")
+        cached_at = float(cached_at_raw) if isinstance(cached_at_raw, int | float) else 0.0
+        if (datetime.now(timezone.utc).timestamp() - cached_at) < _TAIEX_INTRADAY_CACHE_TTL_SECONDS:
+            cached = entry.get("data")
+            if isinstance(cached, list):
+                return cached
+
+    try:
+        data = await run_in_threadpool(_fetch_taiex_intraday_sync, resolution, days)
+    except fubon_market.FubonUnavailable as exc:
+        logger.warning("Fubon index intraday unavailable (%s %s): %s", resolution, days, exc)
+        return []
+
+    _taiex_intraday_cache[key] = {
+        "cached_at": datetime.now(timezone.utc).timestamp(),
+        "data": data,
+    }
+    return data
+
+
+@router.get("/taiex/bars")
+async def get_taiex_bars(
+    resolution: str = Query(default="10", description="分K 解析度: 1/5/10/15/30/60"),
+    days: int = Query(default=30, ge=1, le=60, description="回推日曆日數（預設 30＝約一個月）"),
+) -> dict[str, object]:
+    if resolution not in VALID_INDEX_RESOLUTIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid resolution: {resolution}. Must be one of {VALID_INDEX_RESOLUTIONS}",
+        )
+    return {"title": "加權指數", "data": await _get_taiex_intraday(resolution, days)}
+
+
+@router.get("/taiex/minute-indicators")
+async def get_taiex_minute_indicators(
+    interval: str = Query(default="10m"),
+    days: int = Query(default=30, ge=1, le=60),
+    ma_periods: str = Query(default="8,21,55,89"),
+    ma_type: str = Query(default="sma"),
+    ma_lookback: int = Query(default=8, ge=1, le=250),
+    ma_cooldown: int = Query(default=1, ge=0, le=50),
+    ma_buy_slope_min: float = Query(default=0.05, ge=0.0, le=10.0),
+    ma_sell_slope_max: float = Query(default=0.02, ge=0.0, le=10.0),
+    kdj_period: int = Query(default=9, ge=2, le=250),
+    kdj_k_smooth: int = Query(default=3, ge=1, le=50),
+    kdj_d_smooth: int = Query(default=3, ge=1, le=50),
+    rsi_period: int = Query(default=14, ge=2, le=250),
+    macd_fast: int = Query(default=12, ge=2, le=250),
+    macd_slow: int = Query(default=26, ge=2, le=250),
+    macd_signal: int = Query(default=9, ge=2, le=250),
+    bb_period: int = Query(default=20, ge=2, le=250),
+    bb_std: float = Query(default=2.0, ge=0.5, le=5.0),
+) -> dict[str, object]:
+    if interval not in VALID_INDEX_INTERVALS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid interval: {interval}. Must be one of {VALID_INDEX_INTERVALS}",
+        )
+    if ma_type not in ("sma", "ema"):
+        raise HTTPException(status_code=400, detail="ma_type must be 'sma' or 'ema'")
+    if macd_fast >= macd_slow:
+        raise HTTPException(status_code=400, detail="macd_fast must be less than macd_slow")
+
+    resolution = interval.removesuffix("m")
+    data = await _get_taiex_intraday(resolution, days)
+    if not data:
+        return {"ma": [], "kdj": [], "rsi": [], "macd": [], "bollinger": []}
+
+    dates = [str(item["date"]) for item in data]
+    highs = [float(item["high"]) for item in data]
+    lows = [float(item["low"]) for item in data]
+    closes = [float(item["close"]) for item in data]
+    volumes = [float(item.get("volume") or 0) for item in data]
+
+    periods = [int(p.strip()) for p in ma_periods.split(",") if p.strip().isdigit()]
+    if not periods:
+        periods = [8, 21, 55, 89]
+
+    ma_all = calculate_ma_daniel(
+        dates,
+        highs,
+        lows,
+        closes,
+        volumes,
+        periods=periods,
+        lookback=ma_lookback,
+        ma_type=ma_type,
+        cooldown=ma_cooldown,
+        buy_slope_min=ma_buy_slope_min,
+        sell_slope_max=ma_sell_slope_max,
+    )
+    kdj_all = calculate_kdj(
+        dates,
+        highs,
+        lows,
+        closes,
+        period=kdj_period,
+        k_smooth=kdj_k_smooth,
+        d_smooth=kdj_d_smooth,
+    )
+    rsi_all = calculate_rsi(dates, closes, rsi_period)
+    macd_all = calculate_macd(dates, closes, macd_fast, macd_slow, macd_signal)
+    bollinger_all = calculate_bollinger(dates, closes, bb_period, bb_std)
+
+    return {
+        "ma": ma_all,
+        "kdj": kdj_all,
+        "rsi": rsi_all,
+        "macd": macd_all,
+        "bollinger": bollinger_all,
         "ma_accuracy": calculate_signal_accuracy(ma_all, highs, lows, closes),
     }

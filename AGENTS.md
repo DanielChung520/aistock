@@ -260,10 +260,30 @@ cd frontend && docker compose up -d
 
 ---
 
+## Documentation Discipline（文件同步規範）
+
+**規則：任何建立或修改程式碼的 commit，必須同時新增或更新對應文件。**
+
+- 文件位置：`.docs/**` 或任何 `*.md`。依 `.docs/` 慣例：
+  - 需求 / 討論：`.docs/requirement-<slug>.md`
+  - 子系統規格：`.docs/<subsystem>/`（例：`.docs/accounting/REQUIREMENTS.md`、`.docs/indicators/SCHEMA.md`）
+  - 既有功能說明：`.docs/<topic>.md`（例：`.docs/simulation-replay.md`）
+- 何時必須更新文件：
+  - 新增功能 / 模組 / API → 新增或更新對應需求或規格文件
+  - 改變資料模型（ArangoDB 集合 / schema）/ 架構 / 守則 → 同步更新規格與本檔
+  - 修 bug / 純重構 / 格式 → 若無語義變更可略過（需在 commit message 說明）
+- **強制機制**：本 repo 使用版本控管的 git hook `.githooks/pre-commit`，偵測到程式碼變更但**無任何文件變更**時會**阻擋 commit**。
+  - 一次性啟用（每個 clone 各做一次）：`git config core.hooksPath .githooks`
+  - 緊急略過：`DOC_SYNC_BYPASS=1 git commit ...`（並在 commit message 說明原因）
+- 監督：本規則以 hermes 記憶（`policy-doc-sync`）監督，跨 session 生效。
+
+---
+
 ## Git Conventions
 
 - Branch names: `feat/<slug>`, `fix/<slug>`, `chore/<slug>`.
 - Commit messages follow **Conventional Commits**: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`.
+- 程式碼變更須同步文件（見「Documentation Discipline 文件同步規範」）。
 - Never commit secrets, `.env.local`, or generated build artifacts.
 - Run `npm run typecheck && npm run lint && npm test` before opening a PR.
 
@@ -291,6 +311,7 @@ Next.js (port 33300) → API routes (proxy) → FastAPI (port 38000) → twstock
 - **G1**: Next.js NEVER calls twstock/TWSE directly. ALL stock data flows through FastAPI.
 - **G2**: FastAPI owns WRITE to stock collections. Next.js may READ via arangojs (menu only).
 - **G3**: No real-time polling — daily batch update after market close only.
+  - **例外（2026-10）**：首頁「加權指數 10 分K」圖表可在**台股交易時段（週一–五 09:00–13:35 台北時間）且分頁可見時**自動刷新（間隔 60 秒，僅重抓該指數圖表，display-only、不下單）。此為**唯一的盤中輪詢例外**；其餘股票/選股資料仍維持盤後批次。實作：`frontend/src/app/page.tsx`、`frontend/src/lib/market-hours.ts`；規格：`.docs/dashboard-taiex-10m.md`。
 - **G4**: ALL UI text in 繁體中文. `lang="zh-TW"`.
 - **G5**: 台股紅漲綠跌 (red = up, green = down — opposite of US convention).
 - **G6**: Indicators: MA (configurable periods, SMA/EMA), KDJ (configurable), RSI (configurable), MACD (configurable), Bollinger Bands (configurable). No other indicators.

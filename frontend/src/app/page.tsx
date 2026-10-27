@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppShell } from '@/components/app-shell'
 import { MyStocksList } from '@/components/stocks/MyStocksList'
 import { TodayNewsPanel } from '@/components/stocks/TodayNewsPanel'
@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { Maximize2, Minimize2, ArrowLeft } from 'lucide-react'
 import { useIndicatorSettings } from '@/hooks/use-indicator-settings'
 import { useStockTabs } from '@/lib/stock-tab-context'
+import { isTwMarketOpen } from '@/lib/market-hours'
 import { cachedFetch } from '@/lib/cache/cache-fetch'
 import { makeCacheKey } from '@/lib/cache/cache-keys'
 import type { IndicatorsResponse, IndicatorSettings } from '@/types/stock'
@@ -75,8 +76,8 @@ function TaiexChartSection({
   taiex,
   indicators,
   loading,
-  selectedMonths,
-  onMonthsChange,
+  selectedDays,
+  onDaysChange,
   settings,
   onUpdateSetting,
   onResetSetting,
@@ -87,8 +88,8 @@ function TaiexChartSection({
   taiex: TaiexData | null
   indicators: IndicatorsResponse | null
   loading: boolean
-  selectedMonths: number
-  onMonthsChange: (m: number) => void
+  selectedDays: number
+  onDaysChange: (m: number) => void
   settings: IndicatorSettings
   onUpdateSetting: SettingUpdater
   onResetSetting: SettingResetter
@@ -97,11 +98,10 @@ function TaiexChartSection({
   fillContainer?: boolean
 }) {
   const timeRanges = [
-    { label: '1月', value: 1 },
-    { label: '3月', value: 3 },
-    { label: '6月', value: 6 },
-    { label: '1年', value: 12 },
-    { label: '5年', value: 60 },
+    { label: '5日', value: 5 },
+    { label: '10日', value: 10 },
+    { label: '20日', value: 20 },
+    { label: '1月', value: 30 },
   ]
 
   return (
@@ -115,10 +115,10 @@ function TaiexChartSection({
         {timeRanges.map((range) => (
           <Button
             key={range.value}
-            variant={selectedMonths === range.value ? 'default' : 'outline'}
+            variant={selectedDays === range.value ? 'default' : 'outline'}
             size="sm"
             className="h-7 px-2 text-xs"
-            onClick={() => onMonthsChange(range.value)}
+            onClick={() => onDaysChange(range.value)}
           >
             {range.label}
           </Button>
@@ -156,13 +156,15 @@ function TaiexChartSection({
   )
 }
 
+const TAIEX_REFRESH_INTERVAL_MS = 60 * 1000
+
 export default function DashboardPage() {
   const { settings, updateSetting, resetSetting } = useIndicatorSettings()
 
   const [taiex, setTaiex] = useState<TaiexData | null>(null)
   const [loadingTaiex, setLoadingTaiex] = useState(true)
   const [indicators, setIndicators] = useState<IndicatorsResponse | null>(null)
-  const [selectedMonths, setSelectedMonths] = useState(6)
+  const [selectedDays, setSelectedDays] = useState(30)
   const [chartExpanded, setChartExpanded] = useState(false)
   const { activeTab, openTab, tabs, setActiveTab } = useStockTabs()
 
@@ -175,33 +177,32 @@ export default function DashboardPage() {
     }
   }, [openTab])
 
-  const settingsRef = useRef(settings)
-  settingsRef.current = settings
   const prevSettingsRef = useRef(settings)
   const debounceTimer = useRef<NodeJS.Timeout | null>(null)
 
-  useEffect(() => {
-    async function fetchTaiex() {
+  const loadTaiex = useCallback(
+    async (forceRefresh: boolean) => {
       setLoadingTaiex(true)
       try {
-        const indicatorParams = buildIndicatorParams(settingsRef.current)
-
+        const indicatorParams = buildIndicatorParams(settings)
         const [histResult, indResult] = await Promise.all([
           cachedFetch<TaiexData>({
-            key: makeCacheKey('taiex-history', `months=${selectedMonths}`),
+            key: makeCacheKey('taiex-history', `res=10&days=${selectedDays}`),
             category: 'taiex-history',
+            force: forceRefresh,
             fetcher: async () => {
-              const res = await fetch(`/api/market/taiex?months=${selectedMonths}`)
+              const res = await fetch(`/api/market/taiex/bars?resolution=10&days=${selectedDays}`)
               if (!res.ok) return null
               return (await res.json()) as TaiexData
             },
           }),
           cachedFetch<IndicatorsResponse>({
-            key: makeCacheKey('taiex-indicators', `months=${selectedMonths}`, indicatorParams),
+            key: makeCacheKey('taiex-indicators', `interval=10m&days=${selectedDays}`, indicatorParams),
             category: 'taiex-indicators',
+            force: forceRefresh,
             fetcher: async () => {
               const res = await fetch(
-                `/api/market/taiex/indicators?months=${selectedMonths}&${indicatorParams}`,
+                `/api/market/taiex/minute-indicators?interval=10m&days=${selectedDays}&${indicatorParams}`,
               )
               if (!res.ok) return null
               return (await res.json()) as IndicatorsResponse
@@ -211,32 +212,38 @@ export default function DashboardPage() {
 
         if (histResult.data) setTaiex(histResult.data)
         if (indResult.data) setIndicators(indResult.data)
-
-        if (histResult.isStale || indResult.isStale) {
-          console.log('[taiex] showing stale cache, refreshing in background')
-        }
       } catch (error) {
         console.error('Failed to fetch TAIEX:', error)
       } finally {
         setLoadingTaiex(false)
       }
-    }
+    },
+    [selectedDays, settings],
+  )
 
+  useEffect(() => {
     const settingsChanged = prevSettingsRef.current !== settings
     prevSettingsRef.current = settings
-
-    if (settingsChanged) {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current)
-      debounceTimer.current = setTimeout(fetchTaiex, 500)
-    } else {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current)
-      fetchTaiex()
-    }
-
+    if (debounceTimer.current) clearTimeout(debounceTimer.current)
+    debounceTimer.current = setTimeout(() => void loadTaiex(false), settingsChanged ? 500 : 0)
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current)
     }
-  }, [selectedMonths, settings])
+  }, [loadTaiex, settings])
+
+  useEffect(() => {
+    const refreshIfOpen = () => {
+      if (document.visibilityState !== 'visible') return
+      if (!isTwMarketOpen()) return
+      void loadTaiex(true)
+    }
+    const timer = setInterval(refreshIfOpen, TAIEX_REFRESH_INTERVAL_MS)
+    document.addEventListener('visibilitychange', refreshIfOpen)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', refreshIfOpen)
+    }
+  }, [loadTaiex])
 
   const latestData = taiex?.data?.[taiex.data.length - 1]
   const prevData = taiex?.data?.[taiex.data.length - 2]
@@ -298,8 +305,8 @@ export default function DashboardPage() {
               taiex={taiex}
               indicators={indicators}
               loading={loadingTaiex}
-              selectedMonths={selectedMonths}
-              onMonthsChange={setSelectedMonths}
+              selectedDays={selectedDays}
+              onDaysChange={setSelectedDays}
               settings={settings}
               onUpdateSetting={updateSetting}
               onResetSetting={resetSetting}
@@ -396,20 +403,19 @@ export default function DashboardPage() {
               {/* TAIEX Chart Controls */}
               <div className="flex items-center gap-1 md:gap-1.5 flex-wrap">
                 {[
-                  { label: '1月', value: 1 },
-                  { label: '3月', value: 3 },
-                  { label: '6月', value: 6 },
-                  { label: '1年', value: 12 },
-                  { label: '5年', value: 60 },
+                  { label: '5日', value: 5 },
+                  { label: '10日', value: 10 },
+                  { label: '20日', value: 20 },
+                  { label: '1月', value: 30 },
                 ].map((range) => (
                   <Button
                     key={range.value}
                     variant={
-                      selectedMonths === range.value ? 'default' : 'outline'
+                      selectedDays === range.value ? 'default' : 'outline'
                     }
                     size="sm"
                     className="h-7 px-2 text-xs"
-                    onClick={() => setSelectedMonths(range.value)}
+                    onClick={() => setSelectedDays(range.value)}
                   >
                     {range.label}
                   </Button>
