@@ -7,13 +7,19 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from src.accounting.core import EMPTY, Position, apply_buy, apply_sell
+from src.accounting.core import (
+    EMPTY,
+    Position,
+    apply_buy,
+    apply_sell,
+    apply_shares_delta,
+)
 from src.db import ensure_collection, get_db
 from src.services import ledger_store
 
 COLLECTION = "positions"
 
-_HOLDING_ACTIONS = ("buy", "opening", "sell")
+_HOLDING_ACTIONS = ("buy", "opening", "sell", "dividend", "corporate_action")
 
 
 def ensure_positions() -> None:
@@ -43,6 +49,10 @@ def _aggregate(entries: list[dict]) -> dict[str, dict]:
                 net=float(entry.get("net") or 0.0),
             )
             realized[symbol] = realized.get(symbol, 0.0) + pnl
+        elif action == "dividend":
+            realized[symbol] = realized.get(symbol, 0.0) + float(entry.get("net") or 0.0)
+        elif action == "corporate_action":
+            position = apply_shares_delta(position, delta=int(entry.get("shares") or 0))
         else:
             position = apply_buy(
                 position,

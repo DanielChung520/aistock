@@ -9,7 +9,12 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from src.accounting.core import DAY_TRADE, ETF, STOCK, FeeSchedule
-from src.services import account_store, ledger_store, position_store
+from src.services import (
+    account_store,
+    corporate_action_store,
+    ledger_store,
+    position_store,
+)
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
 
@@ -155,3 +160,61 @@ def reverse_ledger(entry_key: str) -> dict:
     reversal = ledger_store.reverse_entry(entry_key)
     position_store.rebuild(original["account_id"])
     return reversal
+
+
+class CorporateActionIn(BaseModel):
+    symbol: str
+    ex_date: str
+    type: str
+    cash_dividend: float = 0.0
+    stock_ratio: float = 0.0
+    source_ref: str | None = None
+
+
+@router.get("/corporate-actions")
+def list_corporate_actions(symbol: str | None = Query(default=None)) -> dict:
+    rows = corporate_action_store.list_actions(symbol)
+    return {"total": len(rows), "actions": rows}
+
+
+@router.post("/corporate-actions")
+def upsert_corporate_action(req: CorporateActionIn) -> dict:
+    try:
+        return corporate_action_store.upsert_action(
+            req.symbol,
+            req.ex_date,
+            req.type,
+            cash_dividend=req.cash_dividend,
+            stock_ratio=req.stock_ratio,
+            source_ref=req.source_ref,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/accounts/{key}/corporate-actions/{action_key}/apply")
+def apply_corporate_action(key: str, action_key: str) -> dict:
+    _require_account(key)
+    action = corporate_action_store.get_action(action_key)
+    if action is None:
+        raise HTTPException(status_code=404, detail=f"corporate action not found: {action_key}")
+
+    position_store.rebuild(key)
+    position = position_store.get_position(key, action["symbol"])
+    shares = int((position or {}).get("shares", 0) or 0)
+    if shares <= 0:
+        raise HTTPException(status_code=422, detail=f"no holding for {action['symbol']}")
+
+    posted = [
+        ledger_store.post_entry(
+            key,
+            entry["action"],
+            symbol=entry["symbol"],
+            shares=entry["shares"],
+            net=entry.get("net", 0.0),
+            note=entry.get("note", ""),
+        )
+        for entry in corporate_action_store.entries_for(shares, action)
+    ]
+    position_store.rebuild(key)
+    return {"posted": posted, "position": position_store.get_position(key, action["symbol"])}

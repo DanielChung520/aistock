@@ -100,6 +100,22 @@ def apply_sell(position: Position, *, shares: int, net: float) -> tuple[Position
     ), realized_pnl
 
 
+def apply_dividend(position: Position, *, cash_per_share: float) -> tuple[Position, float]:
+    return position, _round(position.shares * cash_per_share)
+
+
+def apply_shares_delta(position: Position, *, delta: int) -> Position:
+    new_shares = position.shares + delta
+    if new_shares <= 0:
+        return EMPTY
+    total_cost = position.shares * position.avg_cost
+    return Position(shares=new_shares, avg_cost=total_cost / new_shares)
+
+
+def apply_rights(position: Position, *, stock_ratio: float) -> Position:
+    return apply_shares_delta(position, delta=round(position.shares * stock_ratio))
+
+
 def buy(position: Position, price: float, shares: int, schedule: FeeSchedule = STOCK) -> BuyResult:
     if price <= 0:
         raise ValueError("price must be positive")

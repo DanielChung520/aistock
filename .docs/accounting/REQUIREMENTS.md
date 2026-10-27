@@ -207,6 +207,11 @@ repo 目前有**三套彼此獨立、帳務語義互不相同**的「模擬/交�
 - **除權（stock_ratio）**：`action=corporate_action`，`shares ×= (1 + stock_ratio)`；**`avg_cost /= (1 + stock_ratio)`**（總成本不變、股數增加）。
 - **兩者並存（both）**：先除息再除權（依公開資訊觀測站定義之順序）。
 
+> **ledger 分錄約定（供 §4.3 投影重放）**：
+> - `dividend`：`shares` = 除息基準持股（資訊用）、`net` = 現金股利總額；投影對 `realized_pnl` 加 `net`，**股數與 `avg_cost` 不變**。
+> - `corporate_action`（除權配股）：`shares` = **新增股數（delta）**；投影以 `apply_shares_delta` 增加股數、**總成本不變**（`avg_cost` 隨之下降）。
+> - 事件的「資料」由外部來源匯入（可插拔）；對持倉的效果由 `entries_for(持股, action)` 產生。
+
 > ⚠️ `simulation.py` **完全沒有**除權息處理 → 長期持倉成本與損益會失真。此為**必要**補強項。
 
 ### 8.2 T+2 交割
@@ -283,7 +288,7 @@ repo 目前有**三套彼此獨立、帳務語義互不相同**的「模擬/交�
 | 2a. `services/account_store.py` + `ledger_store.py`（帳戶 + append-only 流水） | ✅ 完成（2026-10-27） | `account_store.py`、`ledger_store.py`、`tests/test_accounting_stores.py`（6 測試） |
 | 2b. `services/position_store.py`（由 ledger 投影持倉 + 物化） | ✅ 完成（2026-10-27） | `position_store.py`、`tests/test_accounting_positions.py`（5 測試） |
 | 3. `routers/accounting.py`（帳戶 CRUD／手動分錄／持倉查詢）＋ 前端 proxy | ✅ 完成（2026-10-27） | `routers/accounting.py`、`main.py` 註冊、`frontend/src/app/api/accounting/[...path]/route.ts`、`tests/test_accounting_api.py`（4 測試） |
-| 4. `corporate_actions` 匯入 + 除權息自動分錄 | ⬜ 待做 | — |
+| 4. `corporate_actions` + 除權息自動分錄 | 🟡 後端機制完成（2026-10-27） | `services/corporate_action_store.py`、core appliers（除息/除權）、投影處理、API `/accounting/corporate-actions`（含 apply）、`tests/test_accounting_corporate_actions.py`（8 測試）。**外部資料匯入待做（資料源未定）** |
 | 5. 前端帳務頁（帳戶／持倉／流水／損益） | ⬜ 待做 | — |
 | 6. 工作站2 讀 `positions`；接 `sdk/fubon` 作為 ledger 來源 | ⬜ 待做 | — |
 
