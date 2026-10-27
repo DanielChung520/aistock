@@ -275,6 +275,19 @@ repo 目前有**三套彼此獨立、帳務語義互不相同**的「模擬/交�
 
 ---
 
+## 13. 實作進度
+
+| 步驟（見 §12） | 狀態 | 產出 |
+|---|---|---|
+| 1. `accounting/core.py`（費用規則 + 成本/損益，pure） | ✅ 完成（2026-10-27） | `backend/src/accounting/core.py`、`__init__.py`、`backend/tests/test_accounting_core.py`（19 測試） |
+| 2. `services/{account,ledger,position}_store.py`（append-only + 投影） | ⬜ 待做 | — |
+| 3. `routers/accounting.py`（帳戶 CRUD／手動分錄／持倉查詢） | ⬜ 待做 | — |
+| 4. `corporate_actions` 匯入 + 除權息自動分錄 | ⬜ 待做 | — |
+| 5. 前端帳務頁（帳戶／持倉／流水／損益） | ⬜ 待做 | — |
+| 6. 工作站2 讀 `positions`；接 `sdk/fubon` 作為 ledger 來源 | ⬜ 待做 | — |
+
+---
+
 *相關程式碼（既有）：`backend/src/simulation.py`、`backend/src/backtest.py`、`backend/src/routers/backtest.py`、
 `backend/src/services/strategy_store.py`、`backend/src/services/hit_persistence.py`、`sdk/fubon/`。*
 *相關文件：`.docs/simulation-replay.md`。*
