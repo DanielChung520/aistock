@@ -311,7 +311,8 @@ Next.js (port 33300) → API routes (proxy) → FastAPI (port 38000) → twstock
 - **G1**: Next.js NEVER calls twstock/TWSE directly. ALL stock data flows through FastAPI.
 - **G2**: FastAPI owns WRITE to stock collections. Next.js may READ via arangojs (menu only).
 - **G3**: No real-time polling — daily batch update after market close only.
-  - **例外（2026-10）**：首頁「加權指數 10 分K」圖表可在**台股交易時段（週一–五 09:00–13:35 台北時間）且分頁可見時**自動刷新（間隔 60 秒，僅重抓該指數圖表，display-only、不下單）。此為**唯一的盤中輪詢例外**；其餘股票/選股資料仍維持盤後批次。實作：`frontend/src/app/page.tsx`、`frontend/src/lib/market-hours.ts`；規格：`.docs/dashboard-taiex-10m.md`。
+  - **例外1（2026-10）**：首頁「加權指數 10 分K」圖表可在**台股交易時段（週一–五 09:00–13:35 台北時間）且分頁可見時**自動刷新（間隔 60 秒，僅重抓該指數圖表，display-only、不下單）。實作：`frontend/src/app/page.tsx`、`frontend/src/lib/market-hours.ts`；規格：`.docs/dashboard-taiex-10m.md`。
+  - **例外2（2026-10-27 決策，工作站待實作）**：**工作站（階段1/2）允許盤中輪詢**（決策「全面放寬」）。運作限制：僅交易時段（沿用 `market-hours`）、範圍僅限工作站清單（觀察／持倉）、頻率有界。除此之外的股票/選股資料仍維持盤後批次。規格：`.docs/requirement-workstation.md`。
 - **G4**: ALL UI text in 繁體中文. `lang="zh-TW"`.
 - **G5**: 台股紅漲綠跌 (red = up, green = down — opposite of US convention).
 - **G6**: Indicators: MA (configurable periods, SMA/EMA), KDJ (configurable), RSI (configurable), MACD (configurable), Bollinger Bands (configurable). No other indicators.
