@@ -75,6 +75,7 @@ def test_reverse_entry_is_appended_not_mutated(clean_accounting):
     reversal = ledger_store.reverse_entry(entry["_key"], note="keyed wrongly")
     assert reversal["reversal_of"] == entry["_key"]
     assert reversal["gross"] == -100000
+    assert reversal["shares"] == -1000
     assert reversal["net"] == 100142.5
     assert reversal["seq"] == entry["seq"] + 1
     assert ledger_store.get_entry(entry["_key"])["gross"] == 100000

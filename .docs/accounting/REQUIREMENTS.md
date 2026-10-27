@@ -281,7 +281,7 @@ repo 目前有**三套彼此獨立、帳務語義互不相同**的「模擬/交�
 |---|---|---|
 | 1. `accounting/core.py`（費用規則 + 成本/損益，pure） | ✅ 完成（2026-10-27） | `backend/src/accounting/core.py`、`__init__.py`、`backend/tests/test_accounting_core.py`（19 測試） |
 | 2a. `services/account_store.py` + `ledger_store.py`（帳戶 + append-only 流水） | ✅ 完成（2026-10-27） | `account_store.py`、`ledger_store.py`、`tests/test_accounting_stores.py`（6 測試） |
-| 2b. `services/position_store.py`（由 ledger 投影持倉） | ⬜ 待做 | — |
+| 2b. `services/position_store.py`（由 ledger 投影持倉 + 物化） | ✅ 完成（2026-10-27） | `position_store.py`、`tests/test_accounting_positions.py`（5 測試） |
 | 3. `routers/accounting.py`（帳戶 CRUD／手動分錄／持倉查詢） | ⬜ 待做 | — |
 | 4. `corporate_actions` 匯入 + 除權息自動分錄 | ⬜ 待做 | — |
 | 5. 前端帳務頁（帳戶／持倉／流水／損益） | ⬜ 待做 | — |

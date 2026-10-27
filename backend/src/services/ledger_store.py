@@ -123,7 +123,7 @@ def reverse_entry(key: str, *, note: str = "") -> dict | None:
         original["action"],
         symbol=original.get("symbol"),
         price=original.get("price"),
-        shares=original.get("shares"),
+        shares=-int(original["shares"]) if original.get("shares") is not None else None,
         gross=-float(original.get("gross") or 0.0),
         fee=-float(original.get("fee") or 0.0),
         tax=-float(original.get("tax") or 0.0),

@@ -83,6 +83,23 @@ class SellResult:
     pnl_pct: float
 
 
+def apply_buy(position: Position, *, shares: int, gross: float, fee: float) -> Position:
+    total_shares = position.shares + shares
+    if total_shares <= 0:
+        return EMPTY
+    cost_basis = (position.shares * position.avg_cost + gross + fee) / total_shares
+    return Position(shares=total_shares, avg_cost=cost_basis)
+
+
+def apply_sell(position: Position, *, shares: int, net: float) -> tuple[Position, float]:
+    realized_pnl = net - shares * position.avg_cost
+    remaining = position.shares - shares
+    return Position(
+        shares=max(remaining, 0),
+        avg_cost=position.avg_cost if remaining > 0 else 0.0,
+    ), realized_pnl
+
+
 def buy(position: Position, price: float, shares: int, schedule: FeeSchedule = STOCK) -> BuyResult:
     if price <= 0:
         raise ValueError("price must be positive")
@@ -91,10 +108,8 @@ def buy(position: Position, price: float, shares: int, schedule: FeeSchedule = S
 
     gross = _round(price * shares)
     fee = schedule.buy_fee(gross)
-    total_shares = position.shares + shares
-    cost_basis = (position.shares * position.avg_cost + gross + fee) / total_shares
     return BuyResult(
-        position=Position(shares=total_shares, avg_cost=cost_basis),
+        position=apply_buy(position, shares=shares, gross=gross, fee=fee),
         gross=gross,
         fee=fee,
         cash_delta=-_round(gross + fee),
@@ -114,18 +129,16 @@ def sell(position: Position, price: float, shares: int, schedule: FeeSchedule = 
     tax = schedule.sell_tax(gross)
     net = _round(gross - fee - tax)
     cost_basis = position.avg_cost
-    realized_pnl = _round(net - shares * cost_basis)
+    next_position, realized_pnl = apply_sell(position, shares=shares, net=net)
     net_per_share = net / shares
     pnl_pct = (net_per_share / cost_basis - 1) * 100 if cost_basis else 0.0
-
-    remaining = position.shares - shares
     return SellResult(
-        position=Position(shares=remaining, avg_cost=cost_basis if remaining else 0.0),
+        position=next_position,
         gross=gross,
         fee=fee,
         tax=tax,
         net=net,
-        realized_pnl=realized_pnl,
+        realized_pnl=_round(realized_pnl),
         pnl_pct=pnl_pct,
     )
 
