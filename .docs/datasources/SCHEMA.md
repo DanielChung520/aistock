@@ -100,11 +100,12 @@
 
 ---
 
-## 7. v0 範圍
+## 7. v0 範圍與進度
 
 - 詞彙表 `datasets.json`：覆蓋**現有已驗證**的資料集（見該檔），未確認者標 `planned`。
-- 範例來源：`finmind.json`、`twse.json`（本 v0）；其餘（`fubon`/`yfinance`/`mops`/`shioaji`/`twstock`）後續補。
-- **不**在本階段寫 resolver / adapter（先凍結規格，review 後再實作）。
+- 範例來源：`finmind.json`、`twse.json`（本 v0）；其餘（`fubon`/`yfinance`/`mops`/`shioaji`/`twstock`/`quantpass`）後續補。
+- ✅ **`src/datasources/registry.py`**（載入 + `resolve()`）＋ **`GET /api/datasources`** ＋ 漂移測試（2026-10-27）。
+- ⬜ adapter 遷移（`src/datasources/{id}.py`）與 `data_fetcher` 改用 resolver — 後續。
 
 ---
 
