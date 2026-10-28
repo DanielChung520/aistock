@@ -1,0 +1,35 @@
+{
+  "id": "finmind",
+  "name": "FinMind",
+  "kind": "aggregator",
+  "status": "active",
+  "module": "src/finmind.py",
+  "base_url": "https://api.finmindtrade.com/api/v4/data",
+  "auth": {
+    "type": "token",
+    "env": ["FINMIND_TOKEN"],
+    "how": "GET ?token=… 或 header Authorization: Bearer <token>"
+  },
+  "rate_limit": {
+    "note": "免費額度有限；不指定 data_id 的「全市場／某日」查詢需 backer/sponsor 會員"
+  },
+  "cost": "free-tier（部分資料需付費/贊助）",
+  "markets": ["TWSE", "TPEx"],
+  "freshness": "T+1（盤後）",
+  "provides": [
+    { "dataset": "institutional.daily.perstock", "dataset_id": "TaiwanStockInstitutionalInvestorsBuySell" },
+    { "dataset": "margin.short", "dataset_id": "TaiwanStockMarginPurchaseShortSale" },
+    { "dataset": "shareholding", "dataset_id": "TaiwanStockShareholding" },
+    { "dataset": "daytrading", "dataset_id": "TaiwanStockDayTrading" },
+    { "dataset": "short_sale.balance", "dataset_id": "TaiwanDailyShortSaleBalances" },
+    { "dataset": "dividend.policy", "dataset_id": "TaiwanStockDividend", "history_from": "2009" },
+    { "dataset": "dividend.result", "dataset_id": "TaiwanStockDividendResult", "history_from": "2003-05-01" },
+    { "dataset": "futures.tx.minute", "dataset_id": "TaiwanFuturesTick", "note": "付費 tick" }
+  ],
+  "notes": [
+    "TaiwanStockDividendResult 曾出現數據錯誤（GitHub issue #299，2024-09 修復）；ETF 收益分配於 2026-10-22 校正。",
+    "TaiwanStockDividend 欄位：CashEarningsDistribution（每股現金股利）、StockEarningsDistribution+StockStatutorySurplus（股票股利，單位待驗證）、CashExDividendTradingDate（除息日）、StockExDividendTradingDate（除權日）。",
+    "已實測：2026-10-27 以 FINMIND_TOKEN 查 TaiwanStockDividend / TaiwanStockDividendResult（2330，status=200）。"
+  ],
+  "docs": "https://finmind.github.io/tutor/TaiwanMarket/Fundamental/"
+}

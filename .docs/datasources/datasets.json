@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "datasets": {
+    "quote.daily": {
+      "desc": "個股日K OHLCV",
+      "sources": [
+        { "id": "fubon", "priority": 1 },
+        { "id": "yfinance", "priority": 2 }
+      ]
+    },
+    "quote.minute": {
+      "desc": "個股分K（1/5/10/15/30/60）",
+      "sources": [
+        { "id": "fubon", "priority": 1 },
+        { "id": "yfinance", "priority": 2 }
+      ]
+    },
+    "index.daily": {
+      "desc": "市場指數日K（台/亞/美，如 ^TWII）",
+      "sources": [
+        { "id": "yfinance", "priority": 1 }
+      ]
+    },
+    "index.intraday": {
+      "desc": "市場指數分K（如加權指數 10 分K）",
+      "sources": [
+        { "id": "fubon", "priority": 1, "symbols": ["IX0001"], "note": "TSE 加權指數=IX0001，timeframe \"10\"" }
+      ]
+    },
+    "institutional.daily.perstock": {
+      "desc": "個股三大法人買賣超",
+      "sources": [
+        { "id": "finmind", "priority": 1 }
+      ]
+    },
+    "institutional.daily.market": {
+      "desc": "全市場三大法人（TWSE T86 / TPEx）",
+      "sources": [
+        { "id": "twse", "priority": 1, "note": "含 TPEx（同模組處理）" }
+      ]
+    },
+    "margin.short": {
+      "desc": "個股融資融券",
+      "sources": [
+        { "id": "finmind", "priority": 1 }
+      ]
+    },
+    "shareholding": {
+      "desc": "個股股權分散 / 持股",
+      "sources": [
+        { "id": "finmind", "priority": 1 }
+      ]
+    },
+    "daytrading": {
+      "desc": "個股當沖",
+      "sources": [
+        { "id": "finmind", "priority": 1 }
+      ]
+    },
+    "short_sale.balance": {
+      "desc": "個股借券餘額",
+      "sources": [
+        { "id": "finmind", "priority": 1 }
+      ]
+    },
+    "dividend.policy": {
+      "desc": "每股股利政策（現金/股票股利、除權/除息交易日、發放日）",
+      "sources": [
+        { "id": "finmind", "priority": 1, "note": "TaiwanStockDividend，已實測" },
+        { "id": "mops", "priority": 2, "status": "planned", "note": "HTML/big5 爬取，非 API" }
+      ]
+    },
+    "dividend.result": {
+      "desc": "除權除息結果（權息值、減除股利參考價）",
+      "sources": [
+        { "id": "twse", "priority": 1, "note": "TWT48U（逐日全市場 JSON）" },
+        { "id": "finmind", "priority": 2, "note": "TaiwanStockDividendResult" }
+      ]
+    },
+    "futures.tx.minute": {
+      "desc": "TX 台指期分K",
+      "sources": [
+        { "id": "shioaji", "priority": 1, "status": "planned", "note": "SDK 未安裝" },
+        { "id": "finmind", "priority": 2, "note": "付費 tick" },
+        { "id": "quantpass", "priority": 3, "status": "planned" }
+      ]
+    },
+    "auction.announcement": {
+      "desc": "競價拍賣公告",
+      "sources": [
+        { "id": "twse", "priority": 1 }
+      ]
+    },
+    "symbols.master": {
+      "desc": "股票代碼 / 市場別（上市/上櫃）",
+      "sources": [
+        { "id": "twstock", "priority": 1 }
+      ]
+    },
+    "news.today": {
+      "desc": "今日新聞",
+      "sources": [
+        { "id": "unknown", "priority": 1, "status": "planned", "note": "來源待確認（routers/news.py）" }
+      ]
+    }
+  }
+}

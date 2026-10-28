@@ -1,0 +1,38 @@
+{
+  "id": "twse",
+  "name": "臺灣證券交易所（官方開放資料）",
+  "kind": "open_data",
+  "status": "active",
+  "module": "src/institutional.py, src/routers/basics.py",
+  "base_url": "https://www.twse.com.tw/rwd/zh",
+  "auth": {
+    "type": "none"
+  },
+  "rate_limit": {
+    "policy": "3 req / 5 sec（AGENTS.md G7，由 src/rate_limiter.py 強制）"
+  },
+  "cost": "free",
+  "markets": ["TWSE"],
+  "freshness": "盤後 / 每日",
+  "provides": [
+    {
+      "dataset": "institutional.daily.market",
+      "endpoint": "https://www.twse.com.tw/rwd/zh/fund/T86?selectType=ALL&response=json"
+    },
+    {
+      "dataset": "dividend.result",
+      "endpoint": "https://www.twse.com.tw/rwd/zh/exRight/TWT48U?date=YYYYMMDD&selectType=all&response=json",
+      "note": "逐日全市場除權息計算結果（權息值、參考價）"
+    },
+    {
+      "dataset": "auction.announcement",
+      "note": "競價拍賣公告（routers/auction.py）"
+    }
+  ],
+  "notes": [
+    "TPEx（上櫃）三大法人由同模組處理（https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade）。",
+    "TWSE SSL 憑證缺 Subject Key Identifier → Python 3.14+ 需寬鬆 SSL context（見 routers/market.py）。",
+    "官方亦有 t187ap45_l「股利分派情形」等開放資料（data.gov.tw dataset 89748）。"
+  ],
+  "docs": "https://data.gov.tw/dataset/89748"
+}
