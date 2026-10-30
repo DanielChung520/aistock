@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel
@@ -46,7 +47,10 @@ class SourceSettings(BaseModel):
 
 class SendRequest(BaseModel):
     source: str
-    text: str
+    text: str = ""
+    title: str | None = None
+    results: list[dict] | None = None
+    executed_at: float | None = None
 
 
 class BroadcastRequest(BaseModel):
@@ -174,6 +178,91 @@ def push_source(source: str, text: str) -> int:
     if sent:
         for user_id in recipients:
             _store_message(user_id, "out", text)
+    return sent
+
+
+def _flex_cell(text: str, flex: int, align: str = "start", weight: str = "regular") -> dict:
+    return {
+        "type": "text",
+        "text": text,
+        "size": "xs",
+        "flex": flex,
+        "align": align,
+        "weight": weight,
+        "color": "#333333",
+        "wrap": False,
+    }
+
+
+_STRATEGY_LIST_LINK = "https://stk.k84.org/strategy"
+_TOP_N = 10
+
+
+def _format_executed_at(ts: object) -> str:
+    try:
+        return datetime.fromtimestamp(float(ts), timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    except (TypeError, ValueError):
+        return ""
+
+
+def strategy_list_flex(title: str, rows: list[dict], executed_at: object = None) -> dict:
+    header: list[dict] = [{"type": "text", "text": title, "weight": "bold", "size": "sm"}]
+    when = _format_executed_at(executed_at)
+    if when:
+        header.append({"type": "text", "text": f"執行時間 {when}", "size": "xs", "color": "#888888"})
+    body: list[dict] = [
+        {
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+                _flex_cell("股號", 3, "start", "bold"),
+                _flex_cell("名稱", 5, "start", "bold"),
+                _flex_cell("價格", 3, "end", "bold"),
+            ],
+        }
+    ]
+    for row in rows[:_TOP_N]:
+        body.append(
+            {
+                "type": "box",
+                "layout": "horizontal",
+                "contents": [
+                    _flex_cell(str(row.get("stock_id", "")), 3),
+                    _flex_cell(str(row.get("name", "")), 5),
+                    _flex_cell(str(row.get("price", "")), 3, "end"),
+                ],
+            }
+        )
+    return {
+        "type": "bubble",
+        "header": {"type": "box", "layout": "vertical", "spacing": "xs", "contents": header},
+        "body": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": body},
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "link",
+                    "height": "sm",
+                    "action": {"type": "uri", "label": "更多資料 ▸", "uri": _STRATEGY_LIST_LINK},
+                }
+            ],
+        },
+    }
+
+
+def push_strategy_rows(source: str, title: str, rows: list[dict], executed_at: object = None) -> int:
+    if not is_known_source(source) or not source_enabled(source):
+        return 0
+    recipients = subscribed_recipient_ids(source)
+    if not recipients:
+        return 0
+    alt = f"{title}（{len(rows)} 檔）"
+    sent = line_notify.push_flex(recipients, alt, strategy_list_flex(title, rows, executed_at))
+    if sent:
+        for user_id in recipients:
+            _store_message(user_id, "out", alt)
     return sent
 
 
@@ -355,5 +444,9 @@ def list_messages(user_id: str, limit: int = 100) -> dict[str, object]:
 def send(payload: SendRequest) -> dict[str, object]:
     if not is_known_source(payload.source):
         raise HTTPException(status_code=404, detail="unknown source")
-    sent = push_source(payload.source, payload.text)
+    if payload.results:
+        title = payload.title or "aiStock 選股結果"
+        sent = push_strategy_rows(payload.source, title, payload.results, payload.executed_at)
+    else:
+        sent = push_source(payload.source, payload.text)
     return {"sent": sent, "source": payload.source}

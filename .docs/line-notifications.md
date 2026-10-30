@@ -54,9 +54,13 @@ Webhook URL（LINE Console）：**`https://stk.k84.org/api/line/webhook`**
 
 ## 5. 觸發
 
-- **排程選股**：`strategy_screen` job → `routers/strategy.py:run_strategy(source="scheduled")` → 完成後 `push_source("strategy", …)`（依來源開關 + 訂閱權限）。
-- **手動執行選股**（`POST /strategy/screen`）**不自動發送**；改由清單上的「手動發送」呼叫 `POST /api/line/send`（同樣依訂閱權限）。
-- 發送前先檢查來源 `enabled`（`push_source` 內），停用即不發。
+- **排程選股**：`strategy_screen` job → `run_strategy(source="scheduled", notify=params.notify)`；排程設定有 **「送出清單」勾選**（存 `params.notify`），勾了才在執行後發送。
+- **手動執行選股**（`POST /strategy/screen`）**不自動發送**；由執行結果清單**右上「發送到 LINE」**呼叫 `POST /api/line/send`。
+- 兩者都走 `push_strategy_rows()`：依**來源開關** + **收件管理訂閱授權**。
+- **訊息格式＝Flex**（可對齊欄位；純文字辦不到，LINE 比例字型）：
+  - 標題 `aiStock 選股結果・<策略名>`、副標 `執行時間 <時間>`；
+  - 只列 **前 10 檔**（股號 / 名稱 / 價格，欄位對齊、無分隔線）；
+  - 頁尾按鈕 **「更多資料 ▸」** → `https://stk.k84.org/strategy`。
 
 ## 6. 前端
 

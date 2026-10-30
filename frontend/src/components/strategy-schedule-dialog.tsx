@@ -15,6 +15,7 @@ import {
 export interface ScheduleInfo {
   enabled: boolean
   cron: string
+  notify?: boolean
   last_run: number | null
   last_status: string | null
 }
@@ -37,6 +38,7 @@ export function StrategyScheduleDialog({
   onSaved,
 }: StrategyScheduleDialogProps) {
   const [enabled, setEnabled] = useState(initial.enabled)
+  const [notify, setNotify] = useState(Boolean(initial.notify))
   const [cron, setCron] = useState(initial.cron || DEFAULT_CRON)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -77,6 +79,15 @@ export function StrategyScheduleDialog({
             />
             啟用自動執行（跑完寫入「執行記錄」）
           </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="h-4 w-4"
+              checked={notify}
+              onChange={(e) => setNotify(e.target.checked)}
+            />
+            送出清單（排程跑完以 LINE 發送結果）
+          </label>
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground">Cron 運算式（時區 Asia/Taipei）</div>
             <Input
@@ -105,7 +116,7 @@ export function StrategyScheduleDialog({
           >
             移除排程
           </Button>
-          <Button onClick={() => request('PUT', { enabled, cron })} disabled={saving}>
+          <Button onClick={() => request('PUT', { enabled, cron, notify })} disabled={saving}>
             儲存
           </Button>
         </DialogFooter>

@@ -212,7 +212,12 @@ def execute_job(job: dict) -> int | None:
         strategy_id = str(params.get("strategy_id") or "")
         if not strategy_id:
             raise ValueError("strategy_screen job requires params.strategy_id")
-        run_strategy(strategy_id, scope=str(params.get("scope") or "all"), source="scheduled")
+        run_strategy(
+            strategy_id,
+            scope=str(params.get("scope") or "all"),
+            source="scheduled",
+            notify=bool(params.get("notify")),
+        )
         return None
 
     raise ValueError(f"unknown job type: {job_type}")

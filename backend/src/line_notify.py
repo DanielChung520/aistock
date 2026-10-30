@@ -81,26 +81,36 @@ def get_profile(user_id: str) -> dict[str, Any] | None:
         return None
 
 
-def push_text(user_ids: list[str], text: str) -> int:
-    """Push a text message to the given user ids. Returns the number targeted."""
-    targets = [uid for uid in dict.fromkeys(user_ids) if uid]
-    if not targets:
+def _push(targets: list[str], message: dict) -> int:
+    unique = [uid for uid in dict.fromkeys(targets) if uid]
+    if not unique:
         return 0
-    payload = {"to": targets, "messages": [{"type": "text", "text": text[:4900]}]}
     endpoint = (
         f"{LINE_API}/v2/bot/message/push"
-        if len(targets) == 1
+        if len(unique) == 1
         else f"{LINE_API}/v2/bot/message/multicast"
     )
     try:
-        response = httpx.post(endpoint, headers=_auth_headers(), json=payload, timeout=15.0)
+        response = httpx.post(
+            endpoint, headers=_auth_headers(), json={"to": unique, "messages": [message]}, timeout=15.0
+        )
         if response.status_code >= 400:
             logger.warning("LINE push failed (%s): %s", response.status_code, response.text[:300])
             return 0
-        return len(targets)
+        return len(unique)
     except httpx.HTTPError as exc:
         logger.warning("LINE push error: %s", exc)
         return 0
+
+
+def push_text(user_ids: list[str], text: str) -> int:
+    """Push a plain-text message (no column alignment — LINE uses proportional font)."""
+    return _push(user_ids, {"type": "text", "text": text[:4900]})
+
+
+def push_flex(user_ids: list[str], alt_text: str, contents: dict) -> int:
+    """Push a Flex message (supports box layouts = aligned "table" columns)."""
+    return _push(user_ids, {"type": "flex", "altText": alt_text[:400], "contents": contents})
 
 
 def follower_ids() -> list[str] | None:

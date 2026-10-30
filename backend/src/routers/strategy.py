@@ -283,6 +283,7 @@ def run_strategy(
     scope: str = "all",
     source: str = "scheduled",
     limit: int = 5000,
+    notify: bool = False,
 ) -> dict:
     """Run a saved strategy over the universe and persist an execution record."""
     from src.services import strategy_run_store, strategy_store
@@ -301,8 +302,8 @@ def run_strategy(
         source=source,
         hits=results,
     )
-    if source == "scheduled":
-        _notify_line_results(results)
+    if notify:
+        _notify_line_results(results, run.get("executed_at"), str(run.get("strategy_name") or ""))
     return run
 
 
@@ -351,17 +352,18 @@ def list_presets() -> dict:
     return {"presets": PRESET_STRATEGIES}
 
 
-def _notify_line_results(results: list[dict]) -> int:
+def _notify_line_results(
+    results: list[dict], executed_at: object = None, strategy_name: str = ""
+) -> int:
     try:
         from src.routers import line as line_router
 
-        lines = [f"aiStock 選股結果（{len(results)} 檔）"]
-        for row in results[:20]:
-            lines.append(f"{row.get('stock_id', '')} {row.get('name', '')} {row.get('close', '')}")
-        if len(results) > 20:
-            lines.append(f"…另有 {len(results) - 20} 檔")
-        lines.append("https://stk.k84.org/strategy")
-        return line_router.push_source("strategy", "\n".join(lines))
+        rows = [
+            {"stock_id": r.get("stock_id", ""), "name": r.get("name", ""), "price": r.get("close", "")}
+            for r in results
+        ]
+        title = f"aiStock 選股結果・{strategy_name}" if strategy_name else "aiStock 選股結果"
+        return line_router.push_strategy_rows("strategy", title, rows, executed_at)
     except Exception as exc:
         logger.warning("LINE notify failed: %s", exc)
         return 0

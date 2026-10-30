@@ -29,6 +29,7 @@ class StrategyIn(BaseModel):
 class ScheduleIn(BaseModel):
     enabled: bool = True
     cron: str = ""
+    notify: bool = False
 
 
 class StrategyUpdate(BaseModel):
@@ -82,6 +83,7 @@ def get_schedule(key: str) -> dict:
             "strategy_id": key,
             "enabled": False,
             "cron": "",
+            "notify": False,
             "last_run": None,
             "last_status": None,
         }
@@ -89,6 +91,7 @@ def get_schedule(key: str) -> dict:
         "strategy_id": key,
         "enabled": bool(job.get("enabled")),
         "cron": job.get("cron", ""),
+        "notify": bool((job.get("params") or {}).get("notify")),
         "last_run": job.get("last_run"),
         "last_status": job.get("last_status"),
     }
@@ -104,7 +107,15 @@ def set_schedule(key: str, req: ScheduleIn) -> dict:
     job_key = _schedule_key(key)
     now = datetime.now(UTC).timestamp()
     if col.has(job_key):
-        col.update({"_key": job_key, "enabled": req.enabled, "cron": req.cron, "updated_at": now})
+        existing_params = dict((col.get(job_key) or {}).get("params") or {})
+        existing_params["notify"] = req.notify
+        col.update({
+            "_key": job_key,
+            "enabled": req.enabled,
+            "cron": req.cron,
+            "params": existing_params,
+            "updated_at": now,
+        })
     else:
         col.insert({
             "_key": job_key,
@@ -113,7 +124,7 @@ def set_schedule(key: str, req: ScheduleIn) -> dict:
             "description": "自動執行選股策略並寫入執行記錄",
             "enabled": req.enabled,
             "cron": req.cron,
-            "params": {"strategy_id": key, "scope": "all"},
+            "params": {"strategy_id": key, "scope": "all", "notify": req.notify},
             "last_run": None,
             "last_status": None,
             "created_at": now,

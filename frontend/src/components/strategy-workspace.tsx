@@ -106,6 +106,7 @@ export function StrategyWorkspace({ runsOnly = false }: { runsOnly?: boolean }) 
   const [strategies, setStrategies] = useState<StrategyCard[]>([])
   const [strategiesError, setStrategiesError] = useState<string | null>(null)
   const [runs, setRuns] = useState<RunMeta[]>([])
+  const [runSort, setRunSort] = useState<'date' | 'strategy'>('date')
   const [runsError, setRunsError] = useState<string | null>(null)
   const [runningId, setRunningId] = useState<string | null>(null)
   const [selectedRun, setSelectedRun] = useState<RunFull | null>(null)
@@ -272,6 +273,19 @@ export function StrategyWorkspace({ runsOnly = false }: { runsOnly?: boolean }) 
       (r.strategy_name ?? '').toLowerCase().includes(q) ||
       conditionsSummary(r.conditions).toLowerCase().includes(q),
   )
+  const sortedRuns = useMemo(() => {
+    const arr = [...filteredRuns]
+    if (runSort === 'strategy') {
+      arr.sort(
+        (a, b) =>
+          (a.strategy_name || '').localeCompare(b.strategy_name || '') ||
+          b.executed_at - a.executed_at,
+      )
+    } else {
+      arr.sort((a, b) => b.executed_at - a.executed_at)
+    }
+    return arr
+  }, [filteredRuns, runSort])
 
   if (selectedRun) {
     return (
@@ -283,9 +297,9 @@ export function StrategyWorkspace({ runsOnly = false }: { runsOnly?: boolean }) 
   }
 
   return (
-    <div className="p-4 md:p-6">
+    <div className="p-4 md:p-6 h-full flex flex-col overflow-hidden">
       {!runsOnly && (
-        <div className="relative mb-4 max-w-sm">
+        <div className="relative mb-4 max-w-sm shrink-0">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
@@ -295,11 +309,11 @@ export function StrategyWorkspace({ runsOnly = false }: { runsOnly?: boolean }) 
           />
         </div>
       )}
-      <div className={runsOnly ? '' : 'grid grid-cols-1 lg:grid-cols-2 gap-4'}>
+      <div className={runsOnly ? 'flex-1 min-h-0' : 'flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-4'}>
         {!runsOnly && (
-          <section className="space-y-3">
-            <Card>
-              <CardHeader className="pb-3">
+          <section className="min-h-0 flex flex-col">
+            <Card className="flex-1 min-h-0 flex flex-col">
+              <CardHeader className="pb-3 shrink-0">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Layers className="h-4 w-4" />
                   策略庫
@@ -316,7 +330,7 @@ export function StrategyWorkspace({ runsOnly = false }: { runsOnly?: boolean }) 
                   </Button>
                 </CardAction>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="flex-1 min-h-0 overflow-auto space-y-2">
                 {strategiesError && <p className="text-xs text-destructive">錯誤：{strategiesError}</p>}
                 {filteredStrategies.length === 0 && !strategiesError && (
                   <p className="text-xs text-muted-foreground">
@@ -401,15 +415,24 @@ export function StrategyWorkspace({ runsOnly = false }: { runsOnly?: boolean }) 
           </section>
         )}
 
-        <section className="space-y-3">
-          <Card>
-            <CardHeader className="pb-3">
+        <section className="min-h-0 flex flex-col">
+          <Card className="flex-1 min-h-0 flex flex-col">
+            <CardHeader className="pb-3 shrink-0">
               <CardTitle className="flex items-center gap-2 text-base">
                 <History className="h-4 w-4" />
                 執行記錄
               </CardTitle>
               <CardAction>
                 <div className="flex items-center gap-1">
+                  <select
+                    value={runSort}
+                    onChange={(e) => setRunSort(e.target.value as 'date' | 'strategy')}
+                    className="h-8 rounded-md border border-border bg-transparent px-2 text-xs text-muted-foreground"
+                    title="排序方式"
+                  >
+                    <option value="date">依日期（最新）</option>
+                    <option value="strategy">依策略</option>
+                  </select>
                   {runs.length > 0 && (
                     <Button
                       size="sm"
@@ -426,7 +449,7 @@ export function StrategyWorkspace({ runsOnly = false }: { runsOnly?: boolean }) 
                 </div>
               </CardAction>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="flex-1 min-h-0 p-0">
               {runsError && <p className="px-6 pb-2 text-xs text-destructive">錯誤：{runsError}</p>}
               {filteredRuns.length === 0 && !runsError && (
                 <p className="px-6 pb-4 text-xs text-muted-foreground">
@@ -437,9 +460,9 @@ export function StrategyWorkspace({ runsOnly = false }: { runsOnly?: boolean }) 
                       : '尚無執行記錄。在左側策略按「執行」即可產生。'}
                 </p>
               )}
-              <ScrollArea className={!runsOnly && filteredRuns.length > 8 ? 'h-[520px]' : ''}>
+              <ScrollArea className="h-full">
                 <div className="divide-y divide-border">
-                  {filteredRuns.map((r) => (
+                  {sortedRuns.map((r) => (
                     <div
                       key={r.id}
                       className="flex items-center gap-1 pl-2 pr-1 transition-colors hover:bg-muted/40"
@@ -579,16 +602,19 @@ function RunResultView({ run, onBack }: { run: RunFull; onBack: () => void }) {
   const sendToLine = async () => {
     setSending(true)
     try {
-      const lines = [`aiStock 選股結果（${run.count} 檔）`]
-      for (const h of run.hits.slice(0, 20)) {
-        lines.push(`${h.stock_id} ${h.name ?? ''} ${h.price ?? ''}`.trim())
-      }
-      if (run.count > 20) lines.push(`…另有 ${run.count - 20} 檔`)
-      lines.push('https://stk.k84.org/strategy')
       const res = await fetch('/api/line/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: 'strategy', text: lines.join('\n') }),
+        body: JSON.stringify({
+          source: 'strategy',
+          title: run.strategy_name ? `aiStock 選股結果・${run.strategy_name}` : 'aiStock 選股結果',
+          executed_at: run.executed_at,
+          results: run.hits.map((h) => ({
+            stock_id: h.stock_id,
+            name: h.name ?? '',
+            price: h.price ?? '',
+          })),
+        }),
       })
       const data = (await res.json()) as { sent: number }
       if (data.sent > 0) toast.success(`已發送給 ${data.sent} 位訂閱者`)
