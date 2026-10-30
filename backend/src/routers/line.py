@@ -49,6 +49,11 @@ class SendRequest(BaseModel):
     text: str
 
 
+class BroadcastRequest(BaseModel):
+    text: str
+    user_ids: list[str] | None = None
+
+
 def _now() -> float:
     return time.time()
 
@@ -82,8 +87,9 @@ def source_enabled(key: str) -> bool:
 
 def _upsert_recipient(user_id: str, *, followed: bool) -> None:
     col = get_db().collection(RECIPIENTS_COLLECTION)
-    profile = line_notify.get_profile(user_id) if followed else None
     existing = col.get(user_id) if col.has(user_id) else None
+    need_profile = followed and (existing is None or not existing.get("display_name"))
+    profile = line_notify.get_profile(user_id) if need_profile else None
     subscriptions = _normalize_subscriptions((existing or {}).get("subscriptions"))
     if existing and existing.get("enabled") is False:
         subscriptions = {key: False for key in source_keys()}
@@ -184,11 +190,12 @@ async def line_webhook(request: Request) -> dict[str, bool]:
         user_id = (event.get("source") or {}).get("userId")
         if not user_id:
             continue
-        if event_type == "follow":
-            _upsert_recipient(user_id, followed=True)
-        elif event_type == "unfollow":
+        logger.info("LINE webhook event: %s user=%s", event_type, user_id)
+        if event_type == "unfollow":
             _upsert_recipient(user_id, followed=False)
-        elif event_type == "message":
+        else:
+            _upsert_recipient(user_id, followed=True)
+        if event_type == "message":
             message = event.get("message") or {}
             if message.get("type") == "text":
                 _store_message(user_id, "in", str(message.get("text", "")))
@@ -254,6 +261,59 @@ def update_recipient(user_id: str, payload: RecipientUpdate) -> dict[str, object
         update["subscriptions"] = _normalize_subscriptions(payload.subscriptions)
     col.update(update)
     return dict(col.get(user_id))
+
+
+@router.post("/recipients/sync")
+def sync_recipients() -> dict[str, object]:
+    ensure_collections()
+    ids = line_notify.follower_ids()
+    if ids is None:
+        return {
+            "available": False,
+            "followers": 0,
+            "added": 0,
+            "message": "此 LINE 帳號未開放 followers API（需認證帳號/付費方案）；請改用 webhook 事件補名單。",
+        }
+    col = get_db().collection(RECIPIENTS_COLLECTION)
+    added = 0
+    for user_id in ids:
+        if col.has(user_id):
+            if col.get(user_id).get("status") != "followed":
+                col.update({"_key": user_id, "status": "followed", "updated_at": _now()})
+        else:
+            _upsert_recipient(user_id, followed=True)
+            added += 1
+    return {"available": True, "followers": len(ids), "added": added}
+
+
+@router.post("/recipients/refresh-all")
+def refresh_all_recipients() -> dict[str, object]:
+    ensure_collections()
+    cursor = get_db().aql.execute(
+        "FOR r IN line_recipients FILTER r.status == 'followed' RETURN r.user_id"
+    )
+    updated = 0
+    for user_id in cursor:
+        if refresh_profile(user_id):
+            updated += 1
+    return {"updated": updated}
+
+
+@router.post("/broadcast")
+def broadcast(payload: BroadcastRequest) -> dict[str, object]:
+    ensure_collections()
+    if payload.user_ids:
+        targets = list(dict.fromkeys(payload.user_ids))
+    else:
+        cursor = get_db().aql.execute(
+            "FOR r IN line_recipients FILTER r.status == 'followed' RETURN r.user_id"
+        )
+        targets = [row for row in cursor]
+    sent = line_notify.push_text(targets, payload.text)
+    if sent:
+        for user_id in targets:
+            _store_message(user_id, "out", payload.text)
+    return {"sent": sent, "targets": len(targets)}
 
 
 @router.post("/recipients/{user_id}/refresh")

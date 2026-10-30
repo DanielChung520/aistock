@@ -1,11 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AppShell } from '@/components/app-shell'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Send } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -35,6 +36,12 @@ export default function LineRecipientsPage() {
   const [sources, setSources] = useState<Source[]>([])
   const [configured, setConfigured] = useState(true)
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [broadcastOpen, setBroadcastOpen] = useState(false)
+  const [broadcastText, setBroadcastText] = useState('')
+  const [broadcasting, setBroadcasting] = useState(false)
   const [chatFor, setChatFor] = useState<Recipient | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
 
@@ -55,6 +62,14 @@ export default function LineRecipientsPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return recipients
+    return recipients.filter((r) =>
+      `${r.display_name} ${r.user_id} ${r.note} ${r.category}`.toLowerCase().includes(q),
+    )
+  }, [recipients, search])
 
   const patchRecipient = async (user_id: string, body: Record<string, unknown>) => {
     await fetch(`/api/line/recipients/${user_id}`, {
@@ -90,6 +105,54 @@ export default function LineRecipientsPage() {
     }
   }
 
+  const syncRecipients = async () => {
+    setSyncing(true)
+    try {
+      const res = await fetch('/api/line/recipients/sync', { method: 'POST' })
+      const data = (await res.json()) as { available: boolean; followers: number; added: number; message?: string }
+      if (!data.available) toast.error(data.message ?? '此 LINE 帳號未開放名單 API')
+      else toast.success(`LINE 上有 ${data.followers} 位好友，新增 ${data.added} 位`)
+      void load()
+    } catch {
+      toast.error('同步失敗')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const refreshAll = async () => {
+    setRefreshing(true)
+    try {
+      const res = await fetch('/api/line/recipients/refresh-all', { method: 'POST' })
+      const data = (await res.json()) as { updated: number }
+      toast.success(`已更新 ${data.updated} 位名稱`)
+      void load()
+    } catch {
+      toast.error('更新失敗')
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const sendBroadcast = async () => {
+    setBroadcasting(true)
+    try {
+      const res = await fetch('/api/line/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: broadcastText }),
+      })
+      const data = (await res.json()) as { sent: number }
+      toast.success(`已發送給 ${data.sent} 位`)
+      setBroadcastOpen(false)
+      setBroadcastText('')
+    } catch {
+      toast.error('發送失敗')
+    } finally {
+      setBroadcasting(false)
+    }
+  }
+
   const openChat = async (recipient: Recipient) => {
     setChatFor(recipient)
     setMessages([])
@@ -106,32 +169,33 @@ export default function LineRecipientsPage() {
     <AppShell title="收件管理">
       <div className="p-4 md:p-6 space-y-4">
         <Card className="border-border bg-card/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-medium">通知來源</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2 text-xs">
-            <span className="text-muted-foreground mr-1">
-              {configured ? '憑證已設定' : '未設定憑證'} · 來源的發送開關設於各功能本身（此處僅顯示註冊狀態）
-            </span>
-            {sources.map((source) => (
-              <span
-                key={source.key}
-                className={cn(
-                  'rounded-full px-2 py-0.5 border',
-                  source.enabled ? 'border-border text-foreground' : 'border-border/50 text-muted-foreground',
-                )}
-              >
-                {source.label}
-                {source.enabled ? '' : '（停用）'}
-              </span>
-            ))}
+          <CardContent className="py-3 flex flex-wrap items-center gap-2">
+            <div className="flex-1 min-w-[220px]">
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="搜尋名稱 / ID / 備註 / 分類..."
+                className="h-9"
+              />
+            </div>
+            <Button variant="outline" size="sm" className="h-9" onClick={() => void syncRecipients()} disabled={syncing}>
+              {syncing ? '同步中...' : '同步聯絡人'}
+            </Button>
+            <Button variant="outline" size="sm" className="h-9" onClick={() => void refreshAll()} disabled={refreshing}>
+              {refreshing ? '更新中...' : '更新名稱'}
+            </Button>
+            <Button size="sm" className="h-9" onClick={() => setBroadcastOpen(true)}>
+              <Send className="h-3.5 w-3.5 mr-1" />
+              群發信息
+            </Button>
+            {!configured && <span className="text-[11px] text-destructive">未設定憑證</span>}
           </CardContent>
         </Card>
 
         <Card className="border-border bg-card/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg font-medium">
-              名單與授權（已加入 LINE OA 的使用者）
+              名單與授權（{recipients.length} 位）
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0 overflow-x-auto">
@@ -141,9 +205,9 @@ export default function LineRecipientsPage() {
                   <Skeleton key={i} className="h-10 w-full" />
                 ))}
               </div>
-            ) : recipients.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <div className="p-6 text-center text-sm text-muted-foreground">
-                尚無使用者加入 LINE OA
+                {recipients.length === 0 ? '尚無使用者加入 LINE OA' : '沒有符合搜尋的收件者'}
               </div>
             ) : (
               <table className="w-full text-sm">
@@ -161,7 +225,7 @@ export default function LineRecipientsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {recipients.map((recipient) => (
+                  {filtered.map((recipient) => (
                     <tr key={recipient.user_id} className="border-b border-border/40 last:border-b-0">
                       <td className="px-3 py-2 min-w-0">
                         <div className="truncate">{recipient.display_name || '(未命名)'}</div>
@@ -216,6 +280,32 @@ export default function LineRecipientsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {broadcastOpen && (
+        <>
+          <div className="fixed inset-0 z-[99] bg-black/30" onClick={() => setBroadcastOpen(false)} />
+          <div className="fixed z-[100] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] max-w-[92vw] bg-background border border-border rounded-lg shadow-2xl p-4 space-y-3">
+            <div className="text-sm font-medium">群發信息</div>
+            <div className="text-xs text-muted-foreground">
+              發送給全部 {recipients.filter((r) => r.status === 'followed').length} 位已加入 OA 的使用者
+            </div>
+            <textarea
+              value={broadcastText}
+              onChange={(e) => setBroadcastText(e.target.value)}
+              className="w-full h-32 rounded-md border border-border bg-transparent p-2 text-sm"
+              placeholder="輸入訊息..."
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setBroadcastOpen(false)}>
+                取消
+              </Button>
+              <Button size="sm" onClick={() => void sendBroadcast()} disabled={broadcasting || !broadcastText.trim()}>
+                {broadcasting ? '發送中...' : '發送'}
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
 
       {chatFor && (
         <>

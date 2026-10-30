@@ -103,5 +103,37 @@ def push_text(user_ids: list[str], text: str) -> int:
         return 0
 
 
+def follower_ids() -> list[str] | None:
+    """User ids that added the OA (Messaging API ``followers/ids``), or None when the
+    account does not have access to that API (unverified / free tier returns 403)."""
+    ids: list[str] = []
+    start: str | None = None
+    try:
+        while True:
+            params: dict[str, object] = {"limit": 1000}
+            if start:
+                params["start"] = start
+            response = httpx.get(
+                f"{LINE_API}/v2/bot/followers/ids",
+                headers=_auth_headers(),
+                params=params,
+                timeout=15.0,
+            )
+            if response.status_code >= 400:
+                logger.warning(
+                    "LINE followers/ids unavailable (%s): %s", response.status_code, response.text[:200]
+                )
+                return None
+            data = response.json()
+            ids.extend(data.get("userIds") or [])
+            start = data.get("next")
+            if not start:
+                break
+    except httpx.HTTPError as exc:
+        logger.warning("LINE followers/ids error: %s", exc)
+        return None
+    return ids
+
+
 def is_configured() -> bool:
     return bool(access_token())

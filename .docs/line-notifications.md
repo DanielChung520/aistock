@@ -46,6 +46,9 @@ Webhook URL（LINE Console）：**`https://stk.k84.org/api/line/webhook`**
 | `DELETE /api/line/recipients/{user_id}` | 移除 |
 | `GET /api/line/recipients/{user_id}/messages` | 該使用者對話記錄 |
 | `POST /api/line/send` | `{source, text}` → 依訂閱權限發送（手動發送用） |
+| `POST /api/line/recipients/sync` | 主動同步名單（打 LINE `followers/ids`）；未開放時回 `available:false` |
+| `POST /api/line/recipients/refresh-all` | 批次更新全部聯絡人顯示名稱 |
+| `POST /api/line/broadcast` | `{text, user_ids?}` 群發給全部（或指定）followed 使用者 |
 
 憑證：`sdk/lineOA/.env`（`Channel_ID`/`Channel_secret`/`access_token`(檔內 `assess_token`)/`Your_user_ID`），**不進瀏覽器**。
 
@@ -57,12 +60,14 @@ Webhook URL（LINE Console）：**`https://stk.k84.org/api/line/webhook`**
 
 ## 6. 前端
 
-- 頁面 `/settings/recipients`：來源註冊狀態 + **權限矩陣**（使用者 × 來源，逐格勾選）+ 備註/分類編輯 + **對話記錄**面板。
+- 頁面 `/settings/recipients`：**管理區**（搜尋 / 同步聯絡人 / 更新名稱 / 群發信息）+ **權限矩陣**（使用者 × 來源，逐格勾選）+ 備註/分類編輯 + **對話記錄**面板。
 - 入口：sidebar 下方「功能表」popover 底部 **「收件管理」**。
 
 ## 7. 限制 / 待辦
 
 - 需為 **Messaging API channel**（非 LINE Notify）。
+- **名單只能靠事件**：LINE **未提供「列出所有好友」的公開能力給一般帳號**——`GET /v2/bot/followers/ids` 在**未認證/免費層級回 403**（`Access to this API is not available for your account`），需**認證帳號（藍勾）/付費方案**才可用。未開放時，「同步聯絡人」按鈕會回 `available:false`；漏掉的名單只能請對方**傳訊息**或**封鎖→解除封鎖**（重送 `follow`）。
+- webhook 端點上線前加入的舊好友，其 `follow` 已流失且不會補送。
 - multicast 一次上限 500，超過需分批（尚未實作）。
 - 「手動發送」按鈕在個股/策略清單上尚未接線（後端 `POST /api/line/send` 已就緒）。
 - 工作站2/3 為預留來源（功能未實作，尚無發送端）。
