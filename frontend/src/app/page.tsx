@@ -2,9 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppShell } from '@/components/app-shell'
-import { MyStocksList } from '@/components/stocks/MyStocksList'
 import { TodayNewsPanel } from '@/components/stocks/TodayNewsPanel'
-import { StockDetailPanel } from '@/components/stocks/StockDetailPanel'
 import { MultiPaneChart } from '@/components/stocks/MultiPaneChart'
 import { IndicatorToolbar } from '@/components/stocks/IndicatorToolbar'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -166,7 +164,8 @@ export default function DashboardPage() {
   const [indicators, setIndicators] = useState<IndicatorsResponse | null>(null)
   const [selectedDays, setSelectedDays] = useState(30)
   const [chartExpanded, setChartExpanded] = useState(false)
-  const { activeTab, openTab, tabs, setActiveTab } = useStockTabs()
+  const [streamConnected, setStreamConnected] = useState(false)
+  const { openTab } = useStockTabs()
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -232,9 +231,42 @@ export default function DashboardPage() {
   }, [loadTaiex, settings])
 
   useEffect(() => {
+    if (typeof window === 'undefined' || typeof EventSource === 'undefined') return
+    const indicatorParams = buildIndicatorParams(settings)
+    const query = new URLSearchParams({ interval: '10m', days: String(selectedDays) })
+    const url = `/api/market/taiex/stream?${query.toString()}${
+      indicatorParams ? `&${indicatorParams}` : ''
+    }`
+    const source = new EventSource(url)
+
+    source.onopen = () => setStreamConnected(true)
+    source.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as {
+          title?: string
+          data?: TaiexDataPoint[]
+          indicators?: IndicatorsResponse
+        }
+        if (payload.data) setTaiex({ title: payload.title ?? '加權指數', data: payload.data })
+        if (payload.indicators) setIndicators(payload.indicators)
+        setLoadingTaiex(false)
+      } catch (error) {
+        console.error('Failed to parse TAIEX stream event:', error)
+      }
+    }
+    source.onerror = () => setStreamConnected(false)
+
+    return () => {
+      source.close()
+      setStreamConnected(false)
+    }
+  }, [selectedDays, settings])
+
+  useEffect(() => {
     const refreshIfOpen = () => {
       if (document.visibilityState !== 'visible') return
       if (!isTwMarketOpen()) return
+      if (streamConnected) return
       void loadTaiex(true)
     }
     const timer = setInterval(refreshIfOpen, TAIEX_REFRESH_INTERVAL_MS)
@@ -243,7 +275,7 @@ export default function DashboardPage() {
       clearInterval(timer)
       document.removeEventListener('visibilitychange', refreshIfOpen)
     }
-  }, [loadTaiex])
+  }, [loadTaiex, streamConnected])
 
   const latestData = taiex?.data?.[taiex.data.length - 1]
   const prevData = taiex?.data?.[taiex.data.length - 2]
@@ -319,13 +351,10 @@ export default function DashboardPage() {
     )
   }
 
-  const activeTabInfo = activeTab ? tabs.find((t) => t.symbol === activeTab) : null
-  const appTitle = activeTabInfo ? `${activeTabInfo.name}-${activeTabInfo.symbol}` : '台股儀表板'
-
   return (
-    <AppShell title={appTitle}>
+    <AppShell title="台股儀表板">
       {/* Dashboard view */}
-      <div className={activeTab ? 'hidden' : 'h-full'}>
+      <div className="h-full">
         <div
           className="p-4 md:p-6 flex flex-col h-full overflow-hidden"
         >
@@ -457,19 +486,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-
-      {/* Stock tab panels — always rendered, visibility toggled */}
-      {tabs.map((tab) => (
-        <div key={tab.symbol} className={cn(activeTab === tab.symbol ? 'h-full' : 'hidden')}>
-          <div className="p-4 md:p-6 max-w-[100vw] overflow-x-hidden h-full">
-            <StockDetailPanel
-              symbol={tab.symbol}
-              stockName={tab.name}
-              showHeader={false}
-            />
-          </div>
-        </div>
-      ))}
     </AppShell>
   )
 }

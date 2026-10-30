@@ -1,10 +1,14 @@
+import asyncio
+import json
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from src.db import get_db
 from src.models import WatchlistAddRequest
+from src.realtime.live_feed import get_live_feed
 
 
 class WatchlistJobCreateRequest(BaseModel):
@@ -128,6 +132,65 @@ def delete_watchlist_item(stock_id: str) -> dict[str, bool | str]:
 
 
 # ── Watchlist jobs endpoints ────────────────────────────────────
+
+
+_WATCHLIST_STREAM_HEARTBEAT_SECONDS = 20
+
+
+def _quotes_payload(symbols: list[str]) -> dict[str, object]:
+    feed = get_live_feed()
+    quotes: dict[str, object] = {}
+    for symbol in symbols:
+        last = feed.last_bar(symbol)
+        if last is None:
+            continue
+        quotes[symbol] = {"close": last["close"], "volume": feed.day_volume(symbol)}
+    return {"quotes": quotes}
+
+
+@router.get("/stream")
+async def get_watchlist_stream(
+    request: Request,
+    symbols: str = Query(default="", description="逗號分隔的股票代號清單"),
+) -> StreamingResponse:
+    """SSE: push live last price + cumulative day volume for the requested symbols."""
+    wanted = [s.strip() for s in symbols.split(",") if s.strip()]
+    feed = get_live_feed()
+
+    async def event_stream():
+        for symbol in wanted:
+            feed.ensure(symbol)
+        queue: asyncio.Queue[None] = asyncio.Queue(maxsize=1)
+        for symbol in wanted:
+            feed.add_listener(symbol, queue)
+        try:
+            yield f"data: {json.dumps(_quotes_payload(wanted), ensure_ascii=False)}\n\n"
+            while True:
+                try:
+                    await asyncio.wait_for(queue.get(), timeout=_WATCHLIST_STREAM_HEARTBEAT_SECONDS)
+                except asyncio.TimeoutError:
+                    if await request.is_disconnected():
+                        break
+                    yield ": keep-alive\n\n"
+                    continue
+                if await request.is_disconnected():
+                    break
+                yield f"data: {json.dumps(_quotes_payload(wanted), ensure_ascii=False)}\n\n"
+        except asyncio.CancelledError:
+            raise
+        finally:
+            for symbol in wanted:
+                feed.remove_listener(symbol, queue)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @router.get("/jobs")

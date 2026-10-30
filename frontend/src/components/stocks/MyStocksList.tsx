@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { Plus, TrendingUp, TrendingDown } from 'lucide-react'
 import { useWatchlistModal } from '@/lib/watchlist-modal-context'
+import { useStockTabs } from '@/lib/stock-tab-context'
 
 interface MyStockListProps {
   onSelect?: (stockId: string, stockName: string) => void
@@ -20,6 +21,8 @@ interface MyStockItem {
   changePercent: number
   volume: number
   volumeChangePercent: number
+  prevClose: number
+  prevVolume: number
   aiAnalysis: string
   suggestionAction: '買進' | '賣出' | '觀望' | '暫持'
   suggestionPrice: number | null
@@ -87,9 +90,11 @@ function formatVolume(v: number) {
 
 export function MyStocksList({ onSelect }: MyStockListProps = {}) {
   const { open: openWatchlistModal, isOpen: isWatchlistOpen } = useWatchlistModal()
+  const { openTab } = useStockTabs()
   const [stocks, setStocks] = useState<MyStockItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [streamConnected, setStreamConnected] = useState(false)
 
   // Refresh when watchlist modal closes
   const prevOpen = useRef(isWatchlistOpen)
@@ -98,12 +103,12 @@ export function MyStocksList({ onSelect }: MyStockListProps = {}) {
     prevOpen.current = isWatchlistOpen
   }, [isWatchlistOpen])
 
-  // Also poll every 30s to catch changes
+  // Also poll every 30s to catch changes (fallback when the live stream is down)
   useEffect(() => {
-    if (!refreshKey) return
+    if (!refreshKey || streamConnected) return
     const t = setInterval(() => setRefreshKey(k => k + 1), 30000)
     return () => clearInterval(t)
-  }, [])
+  }, [refreshKey, streamConnected])
 
   useEffect(() => {
     const fetchMyStocks = async () => {
@@ -160,6 +165,8 @@ export function MyStocksList({ onSelect }: MyStockListProps = {}) {
                   changePercent,
                   volume,
                   volumeChangePercent,
+                  prevClose: previous.close,
+                  prevVolume: previousVolume,
                   ...mock,
                 }
               }
@@ -183,6 +190,49 @@ export function MyStocksList({ onSelect }: MyStockListProps = {}) {
 
     fetchMyStocks()
   }, [refreshKey])
+
+  const symbolsKey = stocks.map((s) => s.stock_id).join(',')
+
+  useEffect(() => {
+    if (!symbolsKey) return
+    if (typeof window === 'undefined' || typeof EventSource === 'undefined') return
+    const source = new EventSource(`/api/watchlist/stream?symbols=${encodeURIComponent(symbolsKey)}`)
+
+    source.onopen = () => setStreamConnected(true)
+    source.onerror = () => setStreamConnected(false)
+    source.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as {
+          quotes?: Record<string, { close: number; volume: number }>
+        }
+        const quotes = payload.quotes
+        if (!quotes) return
+        setStocks((prev) =>
+          prev.map((item) => {
+            const quote = quotes[item.stock_id]
+            if (!quote) return item
+            const change = quote.close - item.prevClose
+            return {
+              ...item,
+              close: quote.close,
+              change,
+              changePercent: item.prevClose !== 0 ? (change / item.prevClose) * 100 : 0,
+              volume: quote.volume,
+              volumeChangePercent:
+                item.prevVolume !== 0 ? ((quote.volume - item.prevVolume) / item.prevVolume) * 100 : 0,
+            }
+          }),
+        )
+      } catch (error) {
+        console.error('Failed to parse watchlist stream event:', error)
+      }
+    }
+
+    return () => {
+      source.close()
+      setStreamConnected(false)
+    }
+  }, [symbolsKey])
 
   const renderSkeleton = () => (
     <div className="space-y-3 px-4 pb-4">
@@ -310,13 +360,13 @@ export function MyStocksList({ onSelect }: MyStockListProps = {}) {
     }
 
     return (
-      <Link
+      <button
         key={stock.stock_id}
-        href={`/stock/${stock.stock_id}`}
-        className="flex items-center px-4 py-2.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-b-0"
+        onClick={() => openTab(stock.stock_id, stock.name)}
+        className="flex w-full items-center px-4 py-2.5 hover:bg-muted/40 transition-colors text-left border-b border-border/50 last:border-b-0"
       >
         {content}
-      </Link>
+      </button>
     )
   }
 

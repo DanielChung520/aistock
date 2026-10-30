@@ -58,6 +58,17 @@ function formatVol(v: number): string {
   return v.toLocaleString()
 }
 
+function buildOhlcvHtml(o: number, h: number, l: number, c: number, vol: number, prev?: number): string {
+  const changeColor = prev != null ? (c > prev ? '#ef4444' : c < prev ? '#22c55e' : '#9ca3af') : '#9ca3af'
+  return [
+    `<span style="color:#9ca3af">開</span> <span style="color:${changeColor}">${formatNum(o)}</span>`,
+    `<span style="color:#9ca3af">高</span> <span style="color:#ef4444">${formatNum(h)}</span>`,
+    `<span style="color:#9ca3af">低</span> <span style="color:#22c55e">${formatNum(l)}</span>`,
+    `<span style="color:#9ca3af">收</span> <span style="color:${changeColor}">${formatNum(c)}</span>`,
+    `<span style="color:#9ca3af">量</span> <span style="color:#d1d5db">${formatVol(vol)}</span>`,
+  ].join('&nbsp;&nbsp;')
+}
+
 function withAlpha(hex: string, alpha: number): string {
   const m = hex.match(/^#([0-9a-fA-F]{6})$/)
   if (!m) return hex
@@ -115,6 +126,8 @@ export function MultiPaneChart({
   // 換股或重新抓取資料（dataKey 改變）時才回到預設檢視窗。
   const lastRangeRef = useRef<{ from: number; to: number } | null>(null)
   const prevDataKeyRef = useRef<string | null>(null)
+  const prevStructuralKeyRef = useRef<string | null>(null)
+  const prevBarCountRef = useRef(0)
   // Chart + main series are reused across indicator toggles; only indicator series are rebuilt.
   const mainSeriesRef = useRef<ISeriesApi<SeriesType> | null>(null)
   const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
@@ -325,6 +338,24 @@ export function MultiPaneChart({
     }
     indicatorSeriesRef.current = []
 
+    if (isLineRef.current) {
+      ;(mainSeries as ISeriesApi<'Line'>).setData(
+        dedupe(bars.map((d) => ({ time: toTime(d.date), value: d.close }))),
+      )
+    } else {
+      ;(mainSeries as ISeriesApi<'Candlestick'>).setData(
+        dedupe(
+          bars.map((d) => ({
+            time: toTime(d.date),
+            open: d.open,
+            high: d.high,
+            low: d.low,
+            close: d.close,
+          })),
+        ),
+      )
+    }
+
     const tracked: TrackedSeries[] = [
       { series: mainSeries, label: isLineRef.current ? 'Close' : 'OHLCV', color: '', pane: 0 },
     ]
@@ -480,6 +511,37 @@ export function MultiPaneChart({
 
     dataRef.current = data
 
+    const structuralKey = `${chartStyle}|${height}|${measuredWidth}|${measuredHeight}`
+    if (chartRef.current && mainSeriesRef.current && prevStructuralKeyRef.current === structuralKey) {
+      renderIndicators()
+      const overlayEl = overlayElRef.current
+      if (overlayEl) {
+        const lastBar = data[data.length - 1]
+        const prevBar = data.length > 1 ? data[data.length - 2] : undefined
+        overlayEl.innerHTML = buildOhlcvHtml(
+          lastBar.open,
+          lastBar.high,
+          lastBar.low,
+          lastBar.close,
+          lastBar.volume,
+          prevBar?.close,
+        )
+      }
+      const savedRange = lastRangeRef.current
+      if (savedRange && savedRange.to - savedRange.from >= 1) {
+        const prevLast = prevBarCountRef.current - 1
+        const shift = prevLast >= 0 && savedRange.to >= prevLast - 1 ? data.length - 1 - savedRange.to : 0
+        chartRef.current.timeScale().setVisibleLogicalRange({
+          from: savedRange.from + shift,
+          to: savedRange.to + shift,
+        })
+      }
+      prevBarCountRef.current = data.length
+      return
+    }
+    prevStructuralKeyRef.current = structuralKey
+    prevBarCountRef.current = data.length
+
     const isMinuteData = data[0].date.includes(' ') || data[0].date.includes('T')
 
     const toTime = (dateStr: string): Time => {
@@ -619,17 +681,6 @@ export function MultiPaneChart({
     containerRef.current.appendChild(overlayEl)
     overlayElRef.current = overlayEl
 
-    const buildOhlcvHtml = (o: number, h: number, l: number, c: number, vol: number, prev?: number): string => {
-      const changeColor = prev != null ? (c > prev ? '#ef4444' : c < prev ? '#22c55e' : '#9ca3af') : '#9ca3af'
-      return [
-        `<span style="color:#9ca3af">開</span> <span style="color:${changeColor}">${formatNum(o)}</span>`,
-        `<span style="color:#9ca3af">高</span> <span style="color:#ef4444">${formatNum(h)}</span>`,
-        `<span style="color:#9ca3af">低</span> <span style="color:#22c55e">${formatNum(l)}</span>`,
-        `<span style="color:#9ca3af">收</span> <span style="color:${changeColor}">${formatNum(c)}</span>`,
-        `<span style="color:#9ca3af">量</span> <span style="color:#d1d5db">${formatVol(vol)}</span>`,
-      ].join('&nbsp;&nbsp;')
-    }
-
     const buildIndicatorHtml = (seriesList: TrackedSeries[], seriesDataMap: Map<ISeriesApi<SeriesType>, Record<string, unknown>>): string => {
       const parts: string[] = []
       for (const t of seriesList) {
@@ -663,8 +714,11 @@ export function MultiPaneChart({
     overlayEl.innerHTML = buildOhlcvHtml(lastItem.open, lastItem.high, lastItem.low, lastItem.close, lastItem.volume, prevItem?.close)
 
     chart.subscribeCrosshairMove((param) => {
+      const bars = dataRef.current
+      const lastBar = bars[bars.length - 1]
+      const prevBar = bars.length > 1 ? bars[bars.length - 2] : undefined
       if (!param.time || !param.seriesData || param.seriesData.size === 0) {
-        overlayEl.innerHTML = buildOhlcvHtml(lastItem.open, lastItem.high, lastItem.low, lastItem.close, lastItem.volume, prevItem?.close)
+        overlayEl.innerHTML = buildOhlcvHtml(lastBar.open, lastBar.high, lastBar.low, lastBar.close, lastBar.volume, prevBar?.close)
         subOverlaysRef.current.forEach((el, paneIdx) => {
           el.innerHTML = ''
           const paneTracked = trackedRef.current.filter((t) => t.pane === paneIdx)
@@ -672,7 +726,7 @@ export function MultiPaneChart({
             const lastParts: string[] = []
             for (const t of paneTracked) {
               if (t.label === '成交量') {
-                lastParts.push(`<span style="color:${withAlpha(t.color, 0.75)}">${t.label}</span> ${formatVol(lastItem.volume)}`)
+                lastParts.push(`<span style="color:${withAlpha(t.color, 0.75)}">${t.label}</span> ${formatVol(lastBar.volume)}`)
               }
             }
             el.innerHTML = lastParts.join('&nbsp;&nbsp;')
@@ -686,25 +740,25 @@ export function MultiPaneChart({
 
       let hoveredIdx = -1
       if (param.time) {
-        hoveredIdx = data.findIndex((d) => {
+        hoveredIdx = bars.findIndex((d) => {
           const t = toTime(d.date)
           return t === param.time
         })
       }
-      const prevClose = hoveredIdx > 0 ? data[hoveredIdx - 1].close : undefined
+      const prevClose = hoveredIdx > 0 ? bars[hoveredIdx - 1].close : undefined
 
-      onCrosshairDateChangeRef.current?.(hoveredIdx >= 0 ? data[hoveredIdx].date : null)
+      onCrosshairDateChangeRef.current?.(hoveredIdx >= 0 ? bars[hoveredIdx].date : null)
 
       if (ohlcvData && 'open' in ohlcvData) {
         const o = ohlcvData.open as number
         const h = ohlcvData.high as number
         const l = ohlcvData.low as number
         const c = ohlcvData.close as number
-        const volData = hoveredIdx >= 0 ? data[hoveredIdx].volume : 0
+        const volData = hoveredIdx >= 0 ? bars[hoveredIdx].volume : 0
         const mainIndicators = buildIndicatorHtml(trackedRef.current.filter((t) => t.pane === 0), seriesDataMap)
         let danielInfo = ''
         if (indicatorsRef.current?.ma && hoveredIdx >= 0) {
-          const hoveredItem = indicatorsRef.current.ma.find((d) => d.date === data[hoveredIdx].date)
+          const hoveredItem = indicatorsRef.current.ma.find((d) => d.date === bars[hoveredIdx].date)
           if (hoveredItem) {
             const parts: string[] = []
             const sl8 = hoveredItem.slope8

@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.db import ensure_collection, ensure_database, get_db
 from src.data_fetcher import DAILY_COLLECTION, MINUTE_COLLECTION, VP_COLLECTION
+from src.realtime.live_feed import get_live_feed
 from src.scheduler import start_scheduler, stop_scheduler
 from src.routers.accounting import router as accounting_router
 from src.routers.datasources import router as datasources_router
@@ -29,6 +30,7 @@ from src.routers.features import router as features_router
 from src.routers.ai_training import router as ai_training_router
 from src.routers.tx_rl import router as tx_rl_router
 from src.routers.tx_data import router as tx_data_router
+from src.routers.line import ensure_collections as ensure_line_collections, router as line_router
 
 logger = logging.getLogger(__name__)
 
@@ -99,9 +101,12 @@ async def lifespan(_: FastAPI):
     for fields in (["read"], ["scan_at"]):
         if tuple(fields) not in existing:
             hits_col.add_index({"type": "persistent", "fields": fields})
+    ensure_line_collections()
     _seed_stock_codes_if_empty()
     start_scheduler()
+    get_live_feed().start()
     yield
+    get_live_feed().stop()
     stop_scheduler()
 
 
@@ -141,3 +146,4 @@ app.include_router(features_router, prefix="/api")
 app.include_router(ai_training_router, prefix="/api")
 app.include_router(tx_rl_router, prefix="/api")
 app.include_router(tx_data_router, prefix="/api")
+app.include_router(line_router, prefix="/api")

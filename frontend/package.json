@@ -1,6 +1,6 @@
 {
   "name": "projects",
-  "version": "0.2.0",
+  "version": "0.4.2",
   "private": true,
   "scripts": {
     "build": "next build",

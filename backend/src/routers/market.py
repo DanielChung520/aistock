@@ -1,12 +1,16 @@
+import asyncio
+import json
 import logging
 import ssl
 from datetime import date, datetime, timedelta, timezone
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
 from src import fubon_market
+from src.realtime.live_feed import TAIEX_INDEX_SYMBOL, get_live_feed
 from src.indicators import (
     calculate_bollinger,
     calculate_kdj,
@@ -239,7 +243,8 @@ def _fetch_taiex_intraday_sync(resolution: str, days: int) -> list[dict[str, obj
     ]
 
 
-async def _get_taiex_intraday(resolution: str, days: int) -> list[dict[str, object]]:
+async def _get_taiex_intraday_historical(resolution: str, days: int) -> list[dict[str, object]]:
+    """Completed-session bars from Fubon's historical REST (memoized, 60s TTL)."""
     key = (resolution, days)
     entry = _taiex_intraday_cache.get(key)
     if entry:
@@ -261,6 +266,36 @@ async def _get_taiex_intraday(resolution: str, days: int) -> list[dict[str, obje
         "data": data,
     }
     return data
+
+
+def _merge_bars(
+    historical: list[dict[str, object]], live: list[dict[str, object]]
+) -> list[dict[str, object]]:
+    """Merge completed-session bars with today's live bars (live wins on collision)."""
+    if not live:
+        return historical
+    merged: dict[str, dict[str, object]] = {str(bar["date"]): bar for bar in historical}
+    for bar in live:
+        merged[str(bar["date"])] = bar
+    return [merged[key] for key in sorted(merged)]
+
+
+async def _get_taiex_intraday(resolution: str, days: int) -> list[dict[str, object]]:
+    """Historical completed sessions + today's live session (from the realtime feed).
+
+    Fubon's ``historical.candles`` omits the in-progress session, so during market
+    hours the live feed supplies today's bars. Outside market hours (or before the
+    feed's first tick) this degrades to the historical data alone.
+    """
+    historical = await _get_taiex_intraday_historical(resolution, days)
+    try:
+        minutes = int(resolution)
+    except ValueError:
+        return historical
+    feed = get_live_feed()
+    feed.ensure(TAIEX_INDEX_SYMBOL)
+    live = feed.get_bars(TAIEX_INDEX_SYMBOL, minutes)
+    return _merge_bars(historical, live)
 
 
 @router.get("/taiex/bars")
@@ -301,13 +336,57 @@ async def get_taiex_minute_indicators(
             status_code=400,
             detail=f"Invalid interval: {interval}. Must be one of {VALID_INDEX_INTERVALS}",
         )
+    _validate_index_indicator_params(ma_type, macd_fast, macd_slow)
+
+    resolution = interval.removesuffix("m")
+    data = await _get_taiex_intraday(resolution, days)
+    return _compute_taiex_minute_indicators(
+        data,
+        ma_periods=ma_periods,
+        ma_type=ma_type,
+        ma_lookback=ma_lookback,
+        ma_cooldown=ma_cooldown,
+        ma_buy_slope_min=ma_buy_slope_min,
+        ma_sell_slope_max=ma_sell_slope_max,
+        kdj_period=kdj_period,
+        kdj_k_smooth=kdj_k_smooth,
+        kdj_d_smooth=kdj_d_smooth,
+        rsi_period=rsi_period,
+        macd_fast=macd_fast,
+        macd_slow=macd_slow,
+        macd_signal=macd_signal,
+        bb_period=bb_period,
+        bb_std=bb_std,
+    )
+
+
+def _validate_index_indicator_params(ma_type: str, macd_fast: int, macd_slow: int) -> None:
     if ma_type not in ("sma", "ema"):
         raise HTTPException(status_code=400, detail="ma_type must be 'sma' or 'ema'")
     if macd_fast >= macd_slow:
         raise HTTPException(status_code=400, detail="macd_fast must be less than macd_slow")
 
-    resolution = interval.removesuffix("m")
-    data = await _get_taiex_intraday(resolution, days)
+
+def _compute_taiex_minute_indicators(
+    data: list[dict[str, object]],
+    *,
+    ma_periods: str,
+    ma_type: str,
+    ma_lookback: int,
+    ma_cooldown: int,
+    ma_buy_slope_min: float,
+    ma_sell_slope_max: float,
+    kdj_period: int,
+    kdj_k_smooth: int,
+    kdj_d_smooth: int,
+    rsi_period: int,
+    macd_fast: int,
+    macd_slow: int,
+    macd_signal: int,
+    bb_period: int,
+    bb_std: float,
+) -> dict[str, object]:
+    """Compute the index minute-bar indicator bundle (shared by REST + SSE)."""
     if not data:
         return {"ma": [], "kdj": [], "rsi": [], "macd": [], "bollinger": []}
 
@@ -355,3 +434,112 @@ async def get_taiex_minute_indicators(
         "bollinger": bollinger_all,
         "ma_accuracy": calculate_signal_accuracy(ma_all, highs, lows, closes),
     }
+
+
+# ── Live stream (Server-Sent Events) ───────────────────────────
+
+_SSE_HEARTBEAT_SECONDS = 20
+
+
+def _sse_event(payload: dict[str, object]) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+async def _build_taiex_stream_payload(
+    days: int,
+    interval: str,
+    indicator_params: dict[str, object],
+) -> dict[str, object]:
+    resolution = interval.removesuffix("m")
+    data = await _get_taiex_intraday(resolution, days)
+    indicators = _compute_taiex_minute_indicators(data, **indicator_params)  # type: ignore[arg-type]
+    return {"title": "加權指數", "data": data, "indicators": indicators}
+
+
+@router.get("/taiex/stream")
+async def get_taiex_stream(
+    request: Request,
+    interval: str = Query(default="10m"),
+    days: int = Query(default=30, ge=1, le=60),
+    ma_periods: str = Query(default="8,21,55,89"),
+    ma_type: str = Query(default="sma"),
+    ma_lookback: int = Query(default=8, ge=1, le=250),
+    ma_cooldown: int = Query(default=1, ge=0, le=50),
+    ma_buy_slope_min: float = Query(default=0.05, ge=0.0, le=10.0),
+    ma_sell_slope_max: float = Query(default=0.02, ge=0.0, le=10.0),
+    kdj_period: int = Query(default=9, ge=2, le=250),
+    kdj_k_smooth: int = Query(default=3, ge=1, le=50),
+    kdj_d_smooth: int = Query(default=3, ge=1, le=50),
+    rsi_period: int = Query(default=14, ge=2, le=250),
+    macd_fast: int = Query(default=12, ge=2, le=250),
+    macd_slow: int = Query(default=26, ge=2, le=250),
+    macd_signal: int = Query(default=9, ge=2, le=250),
+    bb_period: int = Query(default=20, ge=2, le=250),
+    bb_std: float = Query(default=2.0, ge=0.5, le=5.0),
+) -> StreamingResponse:
+    """SSE: push bars + indicators whenever the live index feed ticks.
+
+    Emits an initial snapshot on connect, then a fresh payload per feed update
+    (the subscriber queue coalesces bursts). Heartbeat comments keep the stream
+    alive between ticks and while the market is closed.
+    """
+    if interval not in VALID_INDEX_INTERVALS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid interval: {interval}. Must be one of {VALID_INDEX_INTERVALS}",
+        )
+    _validate_index_indicator_params(ma_type, macd_fast, macd_slow)
+
+    indicator_params: dict[str, object] = {
+        "ma_periods": ma_periods,
+        "ma_type": ma_type,
+        "ma_lookback": ma_lookback,
+        "ma_cooldown": ma_cooldown,
+        "ma_buy_slope_min": ma_buy_slope_min,
+        "ma_sell_slope_max": ma_sell_slope_max,
+        "kdj_period": kdj_period,
+        "kdj_k_smooth": kdj_k_smooth,
+        "kdj_d_smooth": kdj_d_smooth,
+        "rsi_period": rsi_period,
+        "macd_fast": macd_fast,
+        "macd_slow": macd_slow,
+        "macd_signal": macd_signal,
+        "bb_period": bb_period,
+        "bb_std": bb_std,
+    }
+
+    feed = get_live_feed()
+
+    async def event_stream():
+        feed.ensure(TAIEX_INDEX_SYMBOL)
+        queue: asyncio.Queue[None] = asyncio.Queue(maxsize=1)
+        feed.add_listener(TAIEX_INDEX_SYMBOL, queue)
+        try:
+            yield _sse_event(await _build_taiex_stream_payload(days, interval, indicator_params))
+            while True:
+                try:
+                    await asyncio.wait_for(queue.get(), timeout=_SSE_HEARTBEAT_SECONDS)
+                except asyncio.TimeoutError:
+                    if await request.is_disconnected():
+                        break
+                    yield ": keep-alive\n\n"
+                    continue
+                if await request.is_disconnected():
+                    break
+                yield _sse_event(
+                    await _build_taiex_stream_payload(days, interval, indicator_params)
+                )
+        except asyncio.CancelledError:
+            raise
+        finally:
+            feed.remove_listener(TAIEX_INDEX_SYMBOL, queue)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )

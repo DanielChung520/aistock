@@ -9,7 +9,9 @@ echo "=== Starting aiStack Dev Environment ==="
 echo "[Backend] Starting FastAPI on port 38000..."
 cd "$ROOT/backend"
 source .venv/bin/activate
-python -m uvicorn src.main:app --host 0.0.0.0 --port 38000 --reload &
+# --timeout-graceful-shutdown: long-lived SSE connections (market/stock/watchlist streams)
+# otherwise block uvicorn's graceful shutdown, so `--reload` hangs after the first edit.
+python -m uvicorn src.main:app --host 0.0.0.0 --port 38000 --reload --timeout-graceful-shutdown 5 &
 BACKEND_PID=$!
 echo "[Backend] PID: $BACKEND_PID"
 

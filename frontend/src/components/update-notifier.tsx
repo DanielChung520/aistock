@@ -7,7 +7,7 @@ import { RefreshCw, Download, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { useUpdateStore, getCurrentVersion } from '@/lib/updater'
 
 export function UpdateNotifier() {
-  const { state, downloadAndInstall, dismiss } = useUpdateStore()
+  const { state, downloadAndInstall, dismiss, skipCurrentVersion } = useUpdateStore()
 
   // Auto-check on mount (in production)
   useEffect(() => {
@@ -45,6 +45,7 @@ export function UpdateNotifier() {
             )}
             <DialogFooter className="gap-2">
               <Button variant="ghost" onClick={dismiss}>稍後</Button>
+              <Button variant="outline" onClick={skipCurrentVersion}>略過此版本</Button>
               <Button onClick={downloadAndInstall}>
                 <Download className="h-4 w-4 mr-1" />
                 立即更新

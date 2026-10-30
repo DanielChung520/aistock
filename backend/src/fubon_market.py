@@ -47,6 +47,7 @@ class FubonUnavailable(Exception):
 
 _sdk_lock = threading.Lock()
 _rest_client = None
+_realtime_ws = None
 
 
 def _load_env() -> None:
@@ -62,44 +63,70 @@ def _cert_path() -> str:
     return str(path if path.is_absolute() else (REPO_ROOT / path).resolve())
 
 
+def _init_locked() -> None:
+    """Log in once and memoize the REST + realtime clients. Call under ``_sdk_lock``.
+
+    ``init_realtime`` defaults to Speed mode, whose WebSocket endpoint rejects the
+    ``candles``/``aggregates`` channels (see ``fubon_neo.adapter``). The live index
+    feed needs ``candles``, so we always initialise in Normal mode.
+    """
+    global _rest_client, _realtime_ws
+    if _rest_client is not None:
+        return
+    _load_env()
+    try:
+        from fubon_neo.adapter import Mode
+        from fubon_neo.sdk import FubonSDK
+
+        sdk = FubonSDK()
+        # is_success is False until the API declaration is activated, but market
+        # data works regardless — only a missing marketdata client is fatal.
+        sdk.login(
+            os.environ["FUBON_PERSONAL_ID"],
+            os.environ["FUBON_PASSWORD"],
+            _cert_path(),
+            os.environ.get("FUBON_CERT_PASSWORD") or None,
+        )
+        sdk.init_realtime(mode=Mode.Normal)
+    except Exception as exc:
+        raise FubonUnavailable(f"Fubon login/init failed: {exc}") from exc
+
+    marketdata = getattr(sdk, "marketdata", None)
+    if marketdata is None:
+        raise FubonUnavailable("Fubon marketdata unavailable after init_realtime()")
+    _rest_client = marketdata.rest_client.stock
+    _realtime_ws = marketdata.websocket_client.stock
+    logger.info("Fubon marketdata client initialized (Normal realtime mode)")
+
+
 def get_rest_client():
     """Return a logged-in Fubon marketdata REST client (memoized, thread-safe)."""
-    global _rest_client
     if _rest_client is not None:
         return _rest_client
     with _sdk_lock:
-        if _rest_client is not None:
-            return _rest_client
-        _load_env()
-        try:
-            from fubon_neo.sdk import FubonSDK
-
-            sdk = FubonSDK()
-            # is_success is False until the API declaration is activated, but market
-            # data works regardless — only a missing marketdata client is fatal.
-            sdk.login(
-                os.environ["FUBON_PERSONAL_ID"],
-                os.environ["FUBON_PASSWORD"],
-                _cert_path(),
-                os.environ.get("FUBON_CERT_PASSWORD") or None,
-            )
-            sdk.init_realtime()
-        except Exception as exc:
-            raise FubonUnavailable(f"Fubon login/init failed: {exc}") from exc
-
-        marketdata = getattr(sdk, "marketdata", None)
-        if marketdata is None:
-            raise FubonUnavailable("Fubon marketdata unavailable after init_realtime()")
-        _rest_client = marketdata.rest_client.stock
-        logger.info("Fubon marketdata client initialized")
+        _init_locked()
         return _rest_client
 
 
+def get_realtime_stock_ws():
+    """Return the Fubon stock realtime WebSocket client (``candles`` channel capable).
+
+    Memoized alongside the REST client; the process keeps a single login. The
+    caller is responsible for ``on('message', ...)``/``connect()``/``subscribe()``.
+    """
+    if _realtime_ws is not None:
+        return _realtime_ws
+    with _sdk_lock:
+        _init_locked()
+        return _realtime_ws
+
+
 def reset_client() -> None:
-    """Drop the cached client (tests / reconnect)."""
-    global _rest_client
+    """Drop the cached clients (tests / reconnect)."""
+    global _rest_client, _realtime_ws
     with _sdk_lock:
         _rest_client = None
+        _realtime_ws = None
 
 
 # ── Rate limiting ──────────────────────────────────────────────
@@ -174,11 +201,17 @@ def _chunks(start: date, end: date, span_days: int) -> Iterator[tuple[date, date
         current = chunk_end + timedelta(days=1)
 
 
-def _request(rest, symbol: str, timeframe: str, frm: str, to: str) -> list[dict]:
+def _request(
+    rest, symbol: str, timeframe: str, frm: str, to: str, *, fail_fast: bool = False
+) -> list[dict]:
     """One throttled historical-candles call, with 429 backoff.
 
     A "Resource Not Found" (no data in that window, e.g. deep minute history)
     yields an empty list rather than aborting the whole fetch.
+
+    ``fail_fast`` is for latency-sensitive request paths: on a 429 it raises
+    :class:`FubonUnavailable` immediately instead of sleeping out the 61s
+    window. Batch jobs keep the default (block and retry).
     """
     last_exc: Exception | None = None
     for _ in range(_MAX_RETRIES):
@@ -190,6 +223,10 @@ def _request(rest, symbol: str, timeframe: str, frm: str, to: str) -> list[dict]
         except Exception as exc:
             message = str(exc)
             if "429" in message or "Rate limit" in message:
+                if fail_fast:
+                    raise FubonUnavailable(
+                        f"Fubon rate-limited (429) for {symbol} {timeframe} {frm}~{to}"
+                    ) from exc
                 logger.warning("Fubon 429 for %s; sleeping %ss", symbol, _RETRY_SLEEP)
                 last_exc = exc
                 time.sleep(_RETRY_SLEEP)
@@ -209,11 +246,16 @@ def _request(rest, symbol: str, timeframe: str, frm: str, to: str) -> list[dict]
 
 # ── Public API ─────────────────────────────────────────────────
 
-def fetch_candles(symbol: str, timeframe: str, start: str, end: str) -> list[dict]:
+def fetch_candles(
+    symbol: str, timeframe: str, start: str, end: str, *, fail_fast: bool = False
+) -> list[dict]:
     """Fetch candles for ``symbol`` over ``[start, end]`` (inclusive), ASC by date.
 
-    ``timeframe`` ∈ {"D","W","M","1","15","60"}. Handles the <1-year pagination,
-    the per-request throttle, DESC→ASC reversal and field normalization.
+    ``timeframe`` ∈ {"D","W","M"} for daily, or a minute string ("1","5","10",
+    "15","30","60") for intraday. Verified 2026-10: 富邦指數 IX0001（TSE 加權
+    指數）支援 "10"（10 分K）。Handles the <1-year pagination, the per-request
+    throttle, DESC→ASC reversal and field normalization.
+    ``fail_fast`` propagates to :func:`_request` (no 429 sleep).
     """
     tf = timeframe.upper()
     rest = get_rest_client()
@@ -222,20 +264,22 @@ def fetch_candles(symbol: str, timeframe: str, start: str, end: str) -> list[dic
 
     by_date: dict[str, dict] = {}
     for chunk_start, chunk_end in _chunks(start_date, end_date, _MAX_CHUNK_DAYS):
-        for item in _request(rest, symbol, tf, chunk_start.isoformat(), chunk_end.isoformat()):
+        for item in _request(
+            rest, symbol, tf, chunk_start.isoformat(), chunk_end.isoformat(), fail_fast=fail_fast
+        ):
             row = _normalize_row(item, tf)
             if row is not None:
                 by_date[row["date"]] = row
     return [by_date[key] for key in sorted(by_date)]
 
 
-def fetch_daily(symbol: str, start: str, end: str) -> list[dict]:
-    return fetch_candles(symbol, "D", start, end)
+def fetch_daily(symbol: str, start: str, end: str, *, fail_fast: bool = False) -> list[dict]:
+    return fetch_candles(symbol, "D", start, end, fail_fast=fail_fast)
 
 
-def fetch_15m(symbol: str, start: str, end: str) -> list[dict]:
-    return fetch_candles(symbol, "15", start, end)
+def fetch_15m(symbol: str, start: str, end: str, *, fail_fast: bool = False) -> list[dict]:
+    return fetch_candles(symbol, "15", start, end, fail_fast=fail_fast)
 
 
-def fetch_1m(symbol: str, start: str, end: str) -> list[dict]:
-    return fetch_candles(symbol, "1", start, end)
+def fetch_1m(symbol: str, start: str, end: str, *, fail_fast: bool = False) -> list[dict]:
+    return fetch_candles(symbol, "1", start, end, fail_fast=fail_fast)

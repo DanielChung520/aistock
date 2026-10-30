@@ -1,8 +1,16 @@
+import asyncio
+import json
+import time
 from datetime import date, timedelta
-from fastapi import APIRouter, HTTPException, Query, status
+
+from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
+from starlette.concurrency import run_in_threadpool
 
 from src.data_fetcher import fetch_daily_history, fetch_minute_history
 from src.db import get_db
+from src.realtime.live_feed import get_live_feed
+from src.routers.market import _compute_taiex_minute_indicators
 from src.finmind import (
     fetch_day_trading,
     fetch_institutional_buy_sell,
@@ -64,7 +72,7 @@ async def get_stock_history(
     stock_id: str,
     months: int = Query(default=6, ge=1, le=240),
 ) -> list[dict[str, object]]:
-    return fetch_daily_history(stock_id, months=months)
+    return await run_in_threadpool(fetch_daily_history, stock_id, months=months, fail_fast=True)
 
 
 @router.get("/{stock_id}/indicators")
@@ -102,7 +110,9 @@ async def get_indicators(
     all_periods = parsed_periods + [kdj_period, rsi_period, macd_slow, bb_period]
     warmup_months = min(max(max(all_periods) * 2 // 20, 3), 24)
     try:
-        data = fetch_daily_history(stock_id, months=months + warmup_months)
+        data = await run_in_threadpool(
+            fetch_daily_history, stock_id, months=months + warmup_months, fail_fast=True
+        )
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -204,7 +214,9 @@ async def get_minute_indicators(
     if interval == "1m" and days > 7:
         days = 7
     try:
-        data = fetch_minute_history(stock_id, interval=interval, days=days)
+        data = await run_in_threadpool(
+            fetch_minute_history, stock_id, interval=interval, days=days, fail_fast=True
+        )
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -280,11 +292,13 @@ async def get_stock_chips(
     days: int = Query(default=20, ge=5, le=60),
 ) -> dict[str, object]:
     try:
-        inst_raw = fetch_institutional_buy_sell(stock_id, days=days)
-        margin_raw = fetch_margin_short_sale(stock_id, days=days)
-        shareholding = fetch_shareholding(stock_id)
-        day_trading_raw = fetch_day_trading(stock_id, days=days)
-        short_sale_raw = fetch_short_sale_balances(stock_id, days=days)
+        inst_raw, margin_raw, shareholding, day_trading_raw, short_sale_raw = await asyncio.gather(
+            run_in_threadpool(fetch_institutional_buy_sell, stock_id, days=days),
+            run_in_threadpool(fetch_margin_short_sale, stock_id, days=days),
+            run_in_threadpool(fetch_shareholding, stock_id),
+            run_in_threadpool(fetch_day_trading, stock_id, days=days),
+            run_in_threadpool(fetch_short_sale_balances, stock_id, days=days),
+        )
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -371,7 +385,9 @@ async def get_minute_history(
     if interval == "1m" and days > 7:
         days = 7
     try:
-        minute_data = fetch_minute_history(stock_id, interval=interval, days=days)
+        minute_data = await run_in_threadpool(
+            fetch_minute_history, stock_id, interval=interval, days=days, fail_fast=True
+        )
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -388,3 +404,214 @@ async def get_minute_history(
         }
         for item in minute_data
     ]
+
+
+# ── Live stream (Server-Sent Events) ───────────────────────────
+
+_STOCK_STREAM_HEARTBEAT_SECONDS = 20
+
+
+def _sse_line(payload: dict[str, object]) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+def _merge_minute_bars(
+    historical: list[dict[str, object]], live: list[dict[str, object]], cap: int
+) -> list[dict[str, object]]:
+    merged: dict[str, dict[str, object]] = {str(b["datetime"]): b for b in historical}
+    for bar in live:
+        merged[str(bar["datetime"])] = bar
+    ordered = [merged[key] for key in sorted(merged)]
+    return ordered[-cap:] if cap and len(ordered) > cap else ordered
+
+
+def _live_minute_bars(stock_id: str, minutes: int) -> list[dict[str, object]]:
+    return [
+        {
+            "datetime": bar["date"],
+            "open": bar["open"],
+            "high": bar["high"],
+            "low": bar["low"],
+            "close": bar["close"],
+            "volume": bar["volume"],
+        }
+        for bar in get_live_feed().get_bars(stock_id, minutes)
+    ]
+
+
+_DAILY_STREAM_CACHE_TTL_SECONDS = 60.0
+_daily_stream_cache: dict[tuple[str, int], tuple[float, list[dict[str, object]]]] = {}
+
+
+def _daily_window_start(months: int) -> str:
+    return ((date.today() + timedelta(days=1)) - timedelta(days=months * 35)).isoformat()
+
+
+async def _get_daily_history_cached(stock_id: str, months: int) -> list[dict[str, object]]:
+    key = (stock_id, months)
+    entry = _daily_stream_cache.get(key)
+    now = time.time()
+    if entry is not None and now - entry[0] < _DAILY_STREAM_CACHE_TTL_SECONDS:
+        return entry[1]
+    try:
+        rows: list[dict[str, object]] = list(
+            await run_in_threadpool(fetch_daily_history, stock_id, months=months, fail_fast=True)
+        )
+    except Exception:
+        rows = []
+    _daily_stream_cache[key] = (now, rows)
+    return rows
+
+
+def _merge_daily_bars(
+    historical: list[dict[str, object]], live: dict[str, object] | None
+) -> list[dict[str, object]]:
+    merged: dict[str, dict[str, object]] = {str(b["date"]): b for b in historical}
+    if live is not None:
+        merged[str(live["date"])] = live
+    return [merged[key] for key in sorted(merged)]
+
+
+async def _build_stock_daily_stream_payload(
+    stock_id: str,
+    months: int,
+    indicator_params: dict[str, object],
+) -> dict[str, object]:
+    parsed = [int(p) for p in str(indicator_params["ma_periods"]).split(",") if p.strip().isdigit()]
+    periods = parsed or [8, 21, 55, 89]
+    all_periods = periods + [
+        int(indicator_params["kdj_period"]),
+        int(indicator_params["rsi_period"]),
+        int(indicator_params["macd_slow"]),
+        int(indicator_params["bb_period"]),
+    ]
+    warmup_months = min(max(max(all_periods) * 2 // 20, 3), 24)
+    historical = await _get_daily_history_cached(stock_id, months + warmup_months)
+    merged = _merge_daily_bars(historical, get_live_feed().today_daily_bar(stock_id))
+    computed = _compute_taiex_minute_indicators(merged, **indicator_params)  # type: ignore[arg-type]
+    start = _daily_window_start(months)
+    data = [bar for bar in merged if str(bar["date"]) >= start]
+    indicators: dict[str, object] = {}
+    for key, value in computed.items():
+        if isinstance(value, list):
+            indicators[key] = [item for item in value if str(item.get("date", "")) >= start]
+        else:
+            indicators[key] = value
+    return {"symbol": stock_id, "interval": "D", "data": data, "indicators": indicators}
+
+
+async def _build_stock_stream_payload(
+    stock_id: str,
+    interval: str,
+    days: int,
+    months: int,
+    cap: int,
+    indicator_params: dict[str, object],
+) -> dict[str, object]:
+    feed = get_live_feed()
+    feed.ensure(stock_id)
+    if interval in ("D", "W", "M"):
+        return await _build_stock_daily_stream_payload(stock_id, months, indicator_params)
+    minutes = int(interval.removesuffix("m"))
+    try:
+        historical = await run_in_threadpool(
+            fetch_minute_history, stock_id, interval=interval, days=days, fail_fast=True
+        )
+    except Exception:
+        historical = []
+    bars = _merge_minute_bars(historical, _live_minute_bars(stock_id, minutes), cap)
+    dated = [{**bar, "date": str(bar["datetime"])} for bar in bars]
+    indicators = _compute_taiex_minute_indicators(dated, **indicator_params)  # type: ignore[arg-type]
+    return {"symbol": stock_id, "interval": interval, "data": bars, "indicators": indicators}
+
+
+@router.get("/{stock_id}/stream")
+async def get_stock_stream(
+    request: Request,
+    stock_id: str,
+    interval: str = Query(default="60m", description="1m/5m/10m/15m/30m/60m 或 D（日K）"),
+    days: int = Query(default=30, ge=1, le=60),
+    months: int = Query(default=6, ge=1, le=240),
+    cap: int = Query(default=200, ge=20, le=1000),
+    ma_periods: str = Query(default="8,21,55,89"),
+    ma_type: str = Query(default="sma"),
+    ma_lookback: int = Query(default=8, ge=1, le=250),
+    ma_cooldown: int = Query(default=1, ge=0, le=50),
+    ma_buy_slope_min: float = Query(default=0.05, ge=0.0, le=10.0),
+    ma_sell_slope_max: float = Query(default=0.02, ge=0.0, le=10.0),
+    kdj_period: int = Query(default=9, ge=2, le=250),
+    kdj_k_smooth: int = Query(default=3, ge=1, le=50),
+    kdj_d_smooth: int = Query(default=3, ge=1, le=50),
+    rsi_period: int = Query(default=14, ge=2, le=250),
+    macd_fast: int = Query(default=12, ge=2, le=250),
+    macd_slow: int = Query(default=26, ge=2, le=250),
+    macd_signal: int = Query(default=9, ge=2, le=250),
+    bb_period: int = Query(default=20, ge=2, le=250),
+    bb_std: float = Query(default=2.0, ge=0.5, le=5.0),
+) -> StreamingResponse:
+    """SSE: push a stock's bars + indicators in real time, updating only the live bar."""
+    if interval not in VALID_MINUTE_INTERVALS and interval != "D":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid interval: {interval}. Must be one of {VALID_MINUTE_INTERVALS}",
+        )
+    if ma_type not in ("sma", "ema"):
+        raise HTTPException(status_code=400, detail="ma_type must be 'sma' or 'ema'")
+    if macd_fast >= macd_slow:
+        raise HTTPException(status_code=400, detail="macd_fast must be less than macd_slow")
+
+    indicator_params: dict[str, object] = {
+        "ma_periods": ma_periods,
+        "ma_type": ma_type,
+        "ma_lookback": ma_lookback,
+        "ma_cooldown": ma_cooldown,
+        "ma_buy_slope_min": ma_buy_slope_min,
+        "ma_sell_slope_max": ma_sell_slope_max,
+        "kdj_period": kdj_period,
+        "kdj_k_smooth": kdj_k_smooth,
+        "kdj_d_smooth": kdj_d_smooth,
+        "rsi_period": rsi_period,
+        "macd_fast": macd_fast,
+        "macd_slow": macd_slow,
+        "macd_signal": macd_signal,
+        "bb_period": bb_period,
+        "bb_std": bb_std,
+    }
+
+    feed = get_live_feed()
+
+    async def event_stream():
+        feed.ensure(stock_id)
+        queue: asyncio.Queue[None] = asyncio.Queue(maxsize=1)
+        feed.add_listener(stock_id, queue)
+        try:
+            yield _sse_line(
+                await _build_stock_stream_payload(stock_id, interval, days, months, cap, indicator_params)
+            )
+            while True:
+                try:
+                    await asyncio.wait_for(queue.get(), timeout=_STOCK_STREAM_HEARTBEAT_SECONDS)
+                except asyncio.TimeoutError:
+                    if await request.is_disconnected():
+                        break
+                    yield ": keep-alive\n\n"
+                    continue
+                if await request.is_disconnected():
+                    break
+                yield _sse_line(
+                    await _build_stock_stream_payload(stock_id, interval, days, months, cap, indicator_params)
+                )
+        except asyncio.CancelledError:
+            raise
+        finally:
+            feed.remove_listener(stock_id, queue)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )

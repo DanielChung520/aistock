@@ -2,12 +2,14 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { LayoutGrid, Loader2 } from 'lucide-react'
+import { LayoutGrid, Loader2, RefreshCw, Send } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { getIconComponent } from '@/lib/icon-map'
-import { usePageTabs } from '@/lib/page-tab-context'
+import { useStockTabs } from '@/lib/stock-tab-context'
+import { useUpdateStore, getCurrentVersion, getSkippedVersion } from '@/lib/updater'
+import { toast } from 'sonner'
 import { FUNCTION_PAGES } from '@/lib/page-tabs'
 import type { MenuItemWithChildren } from '@/types/menu'
 
@@ -18,10 +20,12 @@ type MenuData = {
 export function SidebarNav({ className, onNavClick }: { className?: string; onNavClick?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { pinPage } = usePageTabs()
+  const { setActiveTab } = useStockTabs()
   const [menu, setMenu] = useState<MenuData | null>(null)
   const [menuPopoverOpen, setMenuPopoverOpen] = useState(false)
   const [loading, setLoading] = useState(true)
+  const hasUpdate = useUpdateStore((s) => s.state.phase === 'available')
+  const newVersion = useUpdateStore((s) => (s.state.phase === 'available' ? s.state.version : null))
 
   useEffect(() => {
     fetch('/api/menu')
@@ -32,12 +36,13 @@ export function SidebarNav({ className, onNavClick }: { className?: string; onNa
   }, [])
 
   const goPage = (route: string) => {
-    pinPage(route)
+    setActiveTab(null)
     router.push(route)
     onNavClick?.()
   }
 
   const openMenuItem = (href: string) => {
+    setActiveTab(null)
     if (/^https?:\/\//i.test(href)) {
       window.open(href, '_blank', 'noopener,noreferrer')
     } else {
@@ -45,6 +50,26 @@ export function SidebarNav({ className, onNavClick }: { className?: string; onNa
     }
     setMenuPopoverOpen(false)
     onNavClick?.()
+  }
+
+  const handleMenuOpen = (open: boolean) => {
+    setMenuPopoverOpen(open)
+    if (open) void useUpdateStore.getState().check()
+  }
+
+  const handleVersionCheck = async () => {
+    await useUpdateStore.getState().check()
+    const st = useUpdateStore.getState().state
+    if (st.phase === 'available') {
+      return
+    }
+    if (st.phase === 'not-available') {
+      const skipped = getSkippedVersion()
+      if (skipped) toast.info(`已略過 v${skipped}（有更新版本時會再通知）`)
+      else toast.info(`目前已是最新版本 v${getCurrentVersion()}`)
+    } else if (st.phase === 'error') {
+      toast.error(st.message)
+    }
   }
 
   return (
@@ -76,7 +101,7 @@ export function SidebarNav({ className, onNavClick }: { className?: string; onNa
         <div className="flex-1" />
 
         {/* Bottom: Grid menu popover */}
-        <Popover open={menuPopoverOpen} onOpenChange={setMenuPopoverOpen}>
+        <Popover open={menuPopoverOpen} onOpenChange={handleMenuOpen}>
           <PopoverTrigger asChild>
             <button
               className="h-10 w-10 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
@@ -108,9 +133,36 @@ export function SidebarNav({ className, onNavClick }: { className?: string; onNa
                       </button>
                     )
                   })}
+                  {group.key === 'system-admin' && (
+                    <button
+                      type="button"
+                      onClick={handleVersionCheck}
+                      title={hasUpdate ? `有新版本 v${newVersion}` : '檢查是否有新版本'}
+                      className="relative flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm transition-colors text-left hover:bg-muted text-foreground"
+                    >
+                      <RefreshCw className="h-4 w-4 shrink-0" />
+                      <span className="truncate">版本檢查</span>
+                      {hasUpdate && (
+                        <span className="absolute -top-1 -right-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-bold leading-none text-white shadow-sm">
+                          新
+                        </span>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
+
+            <div className="mt-2 border-t border-border pt-2">
+              <button
+                type="button"
+                onClick={() => openMenuItem('/settings/recipients')}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm transition-colors text-left hover:bg-muted text-foreground"
+              >
+                <Send className="h-4 w-4 shrink-0" />
+                <span className="truncate">收件管理</span>
+              </button>
+            </div>
           </PopoverContent>
         </Popover>
       </TooltipProvider>

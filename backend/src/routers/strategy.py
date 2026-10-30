@@ -293,7 +293,7 @@ def run_strategy(
     conditions = _validate_conditions(strategy.get("conditions", []))
     stock_ids_map = _resolve_scope(get_db(), scope) if scope != "all" else None
     results, _ = _scan(conditions, limit, stock_ids_map)
-    return strategy_run_store.create_run(
+    run = strategy_run_store.create_run(
         strategy_id=strategy_id,
         strategy_name=strategy.get("name", ""),
         conditions=conditions,
@@ -301,6 +301,9 @@ def run_strategy(
         source=source,
         hits=results,
     )
+    if source == "scheduled":
+        _notify_line_results(results)
+    return run
 
 
 def _manual_conditions(
@@ -346,6 +349,22 @@ def _manual_conditions(
 def list_presets() -> dict:
     """Return the built-in preset strategies (id / name / description / conditions)."""
     return {"presets": PRESET_STRATEGIES}
+
+
+def _notify_line_results(results: list[dict]) -> int:
+    try:
+        from src.routers import line as line_router
+
+        lines = [f"aiStock 選股結果（{len(results)} 檔）"]
+        for row in results[:20]:
+            lines.append(f"{row.get('stock_id', '')} {row.get('name', '')} {row.get('close', '')}")
+        if len(results) > 20:
+            lines.append(f"…另有 {len(results) - 20} 檔")
+        lines.append("https://stk.k84.org/strategy")
+        return line_router.push_source("strategy", "\n".join(lines))
+    except Exception as exc:
+        logger.warning("LINE notify failed: %s", exc)
+        return 0
 
 
 @router.post("/screen")

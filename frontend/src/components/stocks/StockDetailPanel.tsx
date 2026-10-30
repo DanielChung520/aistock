@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { StockSummaryCard } from '@/components/stocks/StockSummaryCard'
 import { BestFourPointDrawer } from '@/components/stocks/BestFourPointDrawer'
 import { BacktestDrawer } from '@/components/stocks/BacktestDrawer'
@@ -134,7 +134,7 @@ export function StockDetailPanel({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [timeframe, setTimeframe] = useState<'daily' | 'minute'>('daily')
-  const [minuteInterval, setMinuteInterval] = useState<string>('5m')
+  const [minuteInterval, setMinuteInterval] = useState<string>('60m')
   const [minuteData, setMinuteData] = useState<StockMinuteItem[] | null>(null)
   const [minuteLoading, setMinuteLoading] = useState(false)
   const [selectedMonths, setSelectedMonths] = useState<number>(0) // 0 = use system default
@@ -145,19 +145,28 @@ export function StockDetailPanel({
 
   // When simulation replay is active, truncate the chart data (and indicators)
   // to the replayed date so future bars are hidden — matching TradingView replay.
-  const replayData = simFocusDate
-    ? (history ?? []).filter((d) => d.date <= simFocusDate)
-    : (history ?? [])
-  const replayIndicators = simFocusDate && indicators
-    ? {
-        ...indicators,
-        ma: indicators.ma.filter((d) => d.date <= simFocusDate),
-        kdj: indicators.kdj.filter((d) => d.date <= simFocusDate),
-        rsi: indicators.rsi.filter((d) => d.date <= simFocusDate),
-        macd: indicators.macd.filter((d) => d.date <= simFocusDate),
-        bollinger: indicators.bollinger.filter((d) => d.date <= simFocusDate),
-      }
-    : indicators
+  const replayData = useMemo(
+    () => (simFocusDate ? (history ?? []).filter((d) => d.date <= simFocusDate) : (history ?? [])),
+    [simFocusDate, history],
+  )
+  const replayIndicators = useMemo(
+    () =>
+      simFocusDate && indicators
+        ? {
+            ...indicators,
+            ma: indicators.ma.filter((d) => d.date <= simFocusDate),
+            kdj: indicators.kdj.filter((d) => d.date <= simFocusDate),
+            rsi: indicators.rsi.filter((d) => d.date <= simFocusDate),
+            macd: indicators.macd.filter((d) => d.date <= simFocusDate),
+            bollinger: indicators.bollinger.filter((d) => d.date <= simFocusDate),
+          }
+        : indicators,
+    [simFocusDate, indicators],
+  )
+  const minuteChartData = useMemo(
+    () => (minuteData ?? []).map((d) => ({ ...d, date: d.datetime })),
+    [minuteData],
+  )
   const [chartStyle, setChartStyle] = useState<'candle' | 'line'>('candle')
   const [showVolumeProfile, setShowVolumeProfile] = useState(false)
   const [crosshairDate, setCrosshairDate] = useState<string>('')
@@ -486,6 +495,60 @@ export function StockDetailPanel({
     }
   }, [timeframe, minuteInterval, symbol, settings])
 
+  const minuteDays = minuteInterval === '1m' ? 7 : 30
+
+  useEffect(() => {
+    if (timeframe !== 'minute') return
+    if (typeof window === 'undefined' || typeof EventSource === 'undefined') return
+    const indicatorParams = buildIndicatorParams(settings)
+    const query = new URLSearchParams({ interval: minuteInterval, days: String(minuteDays) })
+    const url = `/api/stocks/${symbol}/stream?${query.toString()}${
+      indicatorParams ? `&${indicatorParams}` : ''
+    }`
+    const source = new EventSource(url)
+
+    source.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as {
+          data?: StockMinuteItem[]
+          indicators?: IndicatorsResponse
+        }
+        if (payload.data) setMinuteData(payload.data)
+        if (payload.indicators) setMinuteIndicators(payload.indicators)
+      } catch (error) {
+        console.error('Failed to parse stock stream event:', error)
+      }
+    }
+
+    return () => source.close()
+  }, [timeframe, minuteInterval, minuteDays, symbol, settings])
+
+  useEffect(() => {
+    if (timeframe !== 'daily') return
+    if (typeof window === 'undefined' || typeof EventSource === 'undefined') return
+    const indicatorParams = buildIndicatorParams(settings)
+    const query = new URLSearchParams({ interval: 'D', months: String(selectedMonths) })
+    const url = `/api/stocks/${symbol}/stream?${query.toString()}${
+      indicatorParams ? `&${indicatorParams}` : ''
+    }`
+    const source = new EventSource(url)
+
+    source.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as {
+          data?: StockHistoryItem[]
+          indicators?: IndicatorsResponse
+        }
+        if (payload.data) setHistory(payload.data)
+        if (payload.indicators) setIndicators(payload.indicators)
+      } catch (error) {
+        console.error('Failed to parse stock daily stream event:', error)
+      }
+    }
+
+    return () => source.close()
+  }, [timeframe, symbol, selectedMonths, settings])
+
   const latestItem = history && history.length > 0 ? history[history.length - 1] : undefined
   const prevItem = history && history.length > 1 ? history[history.length - 2] : null
   const changePercent =
@@ -691,10 +754,7 @@ export function StockDetailPanel({
               <Skeleton className="h-full w-full" />
             ) : minuteData && minuteData.length > 0 ? (
               <MultiPaneChart
-                data={minuteData.map((d) => ({
-                  ...d,
-                  date: d.datetime,
-                }))}
+                data={minuteChartData}
                 indicators={minuteIndicators}
                 settings={settings}
                 fillContainer
