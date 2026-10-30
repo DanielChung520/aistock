@@ -15,20 +15,12 @@ import yfinance as yf
 
 from src.celery_app import celery_app
 from src.db import get_db
+from src.market_symbols import yf_symbol
 
 logger = logging.getLogger(__name__)
 
 BACKFILL_START = "2010-01-01"
 BACKFILL_END = "2030-01-01"
-
-
-def _suffix(stock_id: str) -> str:
-    import twstock
-
-    info = twstock.codes.get(stock_id)
-    if info and info.market == "上櫃":
-        return ".TWO"
-    return ".TW"
 
 
 def _fetch_daily(symbol: str, start: str, end: str) -> list[dict]:
@@ -47,7 +39,7 @@ def _fetch_daily_yfinance(symbol: str, start: str, end: str) -> list[dict]:
     # yfinance probes sys.stdout.readable(), which Celery replaces with a
     # LoggingProxy that has no readable() — silence stdout while fetching.
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-        ticker = yf.Ticker(f"{symbol}{_suffix(symbol)}")
+        ticker = yf.Ticker(yf_symbol(symbol))
         hist = ticker.history(start=start, end=end, auto_adjust=False)
     records: list[dict] = []
     for dt, row in hist.iterrows():

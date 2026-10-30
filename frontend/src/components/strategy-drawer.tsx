@@ -53,7 +53,7 @@ export function StrategyDrawer() {
           </Button>
         </header>
         <div className="flex-1 overflow-y-auto">
-          <StrategyWorkspace />
+          <StrategyWorkspace runsOnly />
         </div>
       </aside>
     </>

@@ -20,6 +20,8 @@ import { WatchlistModalProvider } from '@/lib/watchlist-modal-context'
 import { StrategyDrawerProvider } from '@/lib/strategy-drawer-context'
 import { NotificationsDrawerProvider } from '@/lib/notifications-drawer-context'
 import { useAIDrawer, AI_DRAWER_WIDTH } from '@/lib/ai-drawer-context'
+import { useStockTabs } from '@/lib/stock-tab-context'
+import { StockDetailPanel } from '@/components/stocks/StockDetailPanel'
 import { SystemSettingsModalProvider, useSystemSettingsModal } from '@/lib/system-settings-modal-context'
 import { ScheduleSettingsModalProvider, useScheduleSettingsModal } from '@/lib/schedule-settings-modal-context'
 import { FeatureSettingsModalProvider, useFeatureSettingsModal } from '@/lib/feature-settings-modal-context'
@@ -33,6 +35,9 @@ function AppShellInner({ children, title }: { children: React.ReactNode; title?:
   const { isOpen: featuresOpen, close: closeFeatures } = useFeatureSettingsModal()
   const { isOpen: aiOpen, mode: aiMode } = useAIDrawer()
   const aiPushed = aiOpen && aiMode === 'drawer'
+  const { tabs, activeTab } = useStockTabs()
+  const activeStock = activeTab ? tabs.find((t) => t.symbol === activeTab) : null
+  const headerTitle = activeStock ? `${activeStock.name}-${activeStock.symbol}` : title
 
   React.useEffect(() => {
     setMobileMenuOpen(false)
@@ -59,9 +64,18 @@ function AppShellInner({ children, title }: { children: React.ReactNode; title?:
         </div>
 
         <div className="flex-1 flex flex-col min-w-0">
-          <Header onMenuClick={() => setMobileMenuOpen(true)} title={title} />
+          <Header onMenuClick={() => setMobileMenuOpen(true)} title={headerTitle} />
           <main className="flex-1 min-h-0 overflow-auto">
-            {children}
+            {/* 首頁 tab 內容（功能頁）— 股票 tab 啟用時隱藏，但保持 mounted 以保留狀態 */}
+            <div className={activeStock ? 'hidden' : 'h-full'}>{children}</div>
+            {/* 股票圖表 tabs — 全部保持 mounted，僅顯示啟用者；關閉才銷毀 */}
+            {tabs.map((tab) => (
+              <div key={tab.symbol} className={activeTab === tab.symbol ? 'h-full' : 'hidden'}>
+                <div className="p-4 md:p-6 max-w-[100vw] overflow-x-hidden h-full">
+                  <StockDetailPanel symbol={tab.symbol} stockName={tab.name} showHeader={false} />
+                </div>
+              </div>
+            ))}
           </main>
           <Footer />
         </div>

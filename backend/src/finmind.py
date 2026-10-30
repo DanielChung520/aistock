@@ -33,7 +33,7 @@ def _fetch_finmind(
         query_params.update(params)
 
     headers = _finmind_headers()
-    with httpx.Client(timeout=30.0) as client:
+    with httpx.Client(timeout=15.0) as client:
         resp = client.get(BASE_URL, params=query_params, headers=headers)
         resp.raise_for_status()
         data = resp.json()

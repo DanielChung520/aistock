@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Sparkles, Loader2, Play, Plus, X } from 'lucide-react'
 import { useSystemSettings } from '@/hooks/use-system-settings'
+import { useStockTabs } from '@/lib/stock-tab-context'
 
 interface ConditionSpec {
   metric: string
@@ -245,6 +246,7 @@ export function StrategyEditorModal({ open, strategy, onClose, onSaved }: Strate
   }, [])
 
   const { settings, refresh } = useSystemSettings()
+  const { openTab } = useStockTabs()
 
   const buildLlmPayload = (s = settings) => ({
     base_url: s.llm.baseUrl,
@@ -637,7 +639,14 @@ export function StrategyEditorModal({ open, strategy, onClose, onSaved }: Strate
                         {testResult.results.map((r) => (
                           <tr key={r.stock_id} className="border-b border-border/40">
                             <td className="px-2 py-1">
-                              <a href={`/stock/${r.stock_id}`} className="font-mono text-primary hover:underline">
+                              <a
+                                href={`/stock/${r.stock_id}`}
+                                className="font-mono text-primary hover:underline"
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  openTab(r.stock_id, r.name ?? '')
+                                }}
+                              >
                                 {r.stock_id}
                               </a>
                               <span className="ml-2 text-muted-foreground">{r.name}</span>

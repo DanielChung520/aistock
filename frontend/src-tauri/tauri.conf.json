@@ -32,6 +32,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/128x128.png",
       "icons/128x128@2x.png",
@@ -57,5 +58,10 @@
     "longDescription": "EEA - My AI Stock - 台股分析平台，提供 K 線圖、技術指標、法人買賣、即時新聞與 AI 助手。",
     "publisher": "EEA - My AI Stock"
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVEQUM2MjUwMzFEOTMzMjUKUldRbE05a3hVR0tzWFRnOG9UaUhOMmJmbUVwK2JlUkRFL2JSTDREV0VCSHVwbXFNOWRUTDlqUDUK",
+      "endpoints": ["https://stk.k84.org/api/installers/latest.json"]
+    }
+  }
 }

@@ -26,6 +26,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from src.celery_app import celery_app
+from src.market_symbols import DEFAULT_SUFFIX, yf_suffix
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +57,8 @@ def _suffix(stock_id: str) -> str:
     # breaks inside Celery workers, see LoggingProxy issue).
     for s in _universe_stocks():
         if s["stock_id"] == stock_id:
-            return ".TWO" if s.get("market") == "上櫃" else ".TW"
-    return ".TW"
+            return yf_suffix(s.get("market"))
+    return DEFAULT_SUFFIX
 
 
 # ── OHLCV + O1/C1 ─────────────────────────────────────────────

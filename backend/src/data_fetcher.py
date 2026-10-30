@@ -1,12 +1,14 @@
 import logging
+import threading
+import time
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 
-import twstock
 import yfinance as yf
 from arango.exceptions import ArangoError
 
 from src.db import get_db
+from src.market_symbols import yf_symbol
 
 logger = logging.getLogger(__name__)
 
@@ -18,22 +20,97 @@ VP_COLLECTION = "stock_vp_daily"
 # yfinance hard limit: 15m interval returns at most 60 days of history
 YF_15M_MAX_DAYS = 60
 
+# Fallback freshness window (calendar days), used only when the market-index
+# reference below is unavailable or itself stale. Covers the Fri→Mon weekend gap.
+_FRESHNESS_DAYS = 4
 
-def _twse_symbol(symbol: str) -> str:
-    """Convert plain Taiwan stock symbol to yfinance format."""
-    return f"{symbol}.TW"
+# Reference basket for the authoritative "last trading day": large-cap names
+# (almost never suspended) plus the TAIEX index itself. When none of them carries
+# a bar newer than a stock's latest cached bar, the market is closed and nothing
+# new exists to fetch. The index alone is not enough — its job can lag a session.
+_REFERENCE_STOCKS = ("2330", "2317", "2454", "2412", "2308")
+_MARKET_INDEX_SYMBOL = "TWII"
+
+# Trust the reference as the trading-day source only while it is at most this many
+# calendar days old; a long-stale series means the pipelines themselves are behind.
+_MARKET_TRUST_DAYS = 10
+
+# Per-symbol in-process refresh TTL: after a network refetch attempt, suppress
+# further refetches for this long. Guards against request stampedes hammering
+# Fubon (and its 429 backoff) when data is genuinely stale.
+_REFRESH_TTL_SECONDS = 600
+
+_refresh_ts: dict[str, float] = {}
+_refresh_lock = threading.Lock()
 
 
-def _yf_symbol(symbol: str) -> str:
-    """yfinance ticker with correct exchange suffix (.TW vs .TWO).
+def _recently_refreshed(key: str) -> bool:
+    """True when ``key`` was refreshed within ``_REFRESH_TTL_SECONDS``."""
+    with _refresh_lock:
+        ts = _refresh_ts.get(key)
+    return ts is not None and (time.monotonic() - ts) < _REFRESH_TTL_SECONDS
 
-    Unlike _twse_symbol, this picks the suffix from twstock, because
-    TPEx (上櫃) stocks only return data under .TWO — .TW is silently empty.
-    """
-    info = twstock.codes.get(symbol)
-    if info is not None and info.market == "上櫃":
-        return f"{symbol}.TWO"
-    return f"{symbol}.TW"
+
+def _mark_refreshed(key: str) -> None:
+    """Record a completed refresh attempt for ``key`` (monotonic clock)."""
+    with _refresh_lock:
+        _refresh_ts[key] = time.monotonic()
+
+
+_market_date_lock = threading.Lock()
+_market_date_ts = 0.0
+_market_date_value: str | None = None
+
+
+def _last_trading_date() -> str | None:
+    """Newest trading date across the reference basket + TAIEX, cached in-process."""
+    global _market_date_ts, _market_date_value
+    now = time.monotonic()
+    with _market_date_lock:
+        if (now - _market_date_ts) < _REFRESH_TTL_SECONDS:
+            return _market_date_value
+
+    db = get_db()
+    found: list[str] = []
+    try:
+        rows = list(
+            db.aql.execute(
+                """
+                FOR d IN stock_daily
+                  FILTER d.stock_id IN @refs
+                  COLLECT AGGREGATE m = MAX(d.date)
+                  RETURN m
+                """,
+                bind_vars={"refs": list(_REFERENCE_STOCKS)},
+            )
+        )
+        if rows and rows[0]:
+            found.append(str(rows[0]))
+    except ArangoError:
+        pass
+    try:
+        rows = list(
+            db.aql.execute(
+                """
+                FOR d IN market_index_daily
+                  FILTER d.symbol == @symbol
+                  SORT d.date DESC
+                  LIMIT 1
+                  RETURN d.date
+                """,
+                bind_vars={"symbol": _MARKET_INDEX_SYMBOL},
+            )
+        )
+        if rows:
+            found.append(str(rows[0]))
+    except ArangoError:
+        pass
+
+    latest = max(found) if found else None
+    with _market_date_lock:
+        _market_date_ts = now
+        _market_date_value = latest
+    return latest
 
 
 def _parse_yfinance_index(idx) -> str:
@@ -163,24 +240,28 @@ def store_minute_15m(symbol: str, records: list[dict]) -> None:
 
 # ── Source adapters: Fubon first, yfinance fallback ───────────
 
-def _fubon_daily(symbol: str, start: str, end: str) -> list[dict] | None:
+def _fubon_daily(
+    symbol: str, start: str, end: str, *, fail_fast: bool = False
+) -> list[dict] | None:
     """Daily bars from Fubon; None means yfinance fallback."""
     try:
         from src import fubon_market
 
-        records = fubon_market.fetch_daily(symbol, start, end)
+        records = fubon_market.fetch_daily(symbol, start, end, fail_fast=fail_fast)
         return records or None
     except fubon_market.FubonUnavailable as exc:
         logger.warning("Fubon daily unavailable for %s (%s); using yfinance", symbol, exc)
         return None
 
 
-def _fubon_minute(symbol: str, timeframe: str, start: str, end: str) -> list[dict] | None:
+def _fubon_minute(
+    symbol: str, timeframe: str, start: str, end: str, *, fail_fast: bool = False
+) -> list[dict] | None:
     """Minute bars from Fubon (with a `datetime` key); None means yfinance fallback."""
     try:
         from src import fubon_market
 
-        records = fubon_market.fetch_candles(symbol, timeframe, start, end)
+        records = fubon_market.fetch_candles(symbol, timeframe, start, end, fail_fast=fail_fast)
         if not records:
             return None
         return [
@@ -200,7 +281,7 @@ def _fubon_minute(symbol: str, timeframe: str, start: str, end: str) -> list[dic
 
 
 def _yf_daily_records(symbol: str, start: str, end: str) -> list[dict]:
-    ticker = yf.Ticker(_twse_symbol(symbol))
+    ticker = yf.Ticker(yf_symbol(symbol))
     # auto_adjust=False keeps RAW prices consistent with Fubon and the bulk backfill.
     hist = ticker.history(start=start, end=end, auto_adjust=False)
     records: list[dict] = []
@@ -224,6 +305,8 @@ def _yf_daily_records(symbol: str, start: str, end: str) -> list[dict]:
 def fetch_daily_history(
     symbol: str,
     months: int = 6,
+    *,
+    fail_fast: bool = False,
 ) -> list[dict]:
     _ensure_collections()
     db = get_db()
@@ -242,16 +325,38 @@ def fetch_daily_history(
     cursor = db.aql.execute(aql, bind_vars={"symbol": symbol, "start": start_str})
     cached = list(cursor)
 
-    # Check if we have the full range (latest record is recent enough)
+    # Freshness is anchored to the market's own last trading day (TWII): when the
+    # index carries no bar newer than this stock's latest cached bar, the market
+    # is closed for that session — nothing exists to fetch and we must not retry,
+    # or a holiday would re-fetch on every request. The calendar window is only a
+    # fallback for when the index series itself is behind or missing.
     if cached:
         latest = cached[-1]["date"]
-        if latest >= (date.today() - timedelta(days=1)).isoformat():
+        last_trading = _last_trading_date()
+        trust_start = (date.today() - timedelta(days=_MARKET_TRUST_DAYS)).isoformat()
+        if last_trading is not None and last_trading >= trust_start:
+            if latest >= last_trading:
+                return cached
+        elif latest >= (date.today() - timedelta(days=_FRESHNESS_DAYS)).isoformat():
             return cached
 
+    refresh_key = f"daily:{symbol}"
+    if _recently_refreshed(refresh_key):
+        return cached
+
+    # Tail-only refetch: only ask for bars after the newest cached one. With no
+    # cache at all, fetch the full requested window.
+    if cached:
+        fetch_start = (date.fromisoformat(cached[-1]["date"]) + timedelta(days=1)).isoformat()
+    else:
+        fetch_start = start.isoformat()
+    fetch_end = end.isoformat()
+
     # Prefer Fubon; fall back to yfinance only when Fubon is unavailable.
-    records = _fubon_daily(symbol, start.isoformat(), end.isoformat())
+    records = _fubon_daily(symbol, fetch_start, fetch_end, fail_fast=fail_fast)
     if records is None:
-        records = _yf_daily_records(symbol, start.isoformat(), end.isoformat())
+        records = _yf_daily_records(symbol, fetch_start, fetch_end)
+    _mark_refreshed(refresh_key)
     if not records:
         return cached if cached else []
 
@@ -273,6 +378,8 @@ def fetch_minute_history(
     symbol: str,
     interval: Literal["1m", "5m", "10m", "15m", "30m", "60m"] = "5m",
     days: int = 30,
+    *,
+    fail_fast: bool = False,
 ) -> list[dict]:
     # Always fetch 1m raw and aggregate on-the-fly
     _ensure_collections()
@@ -292,11 +399,15 @@ def fetch_minute_history(
     cursor = db.aql.execute(aql, bind_vars={"symbol": symbol, "start": start_str})
     cached_1m = list(cursor)
 
-    if not cached_1m or (cached_1m and cached_1m[-1]["datetime"] < (datetime.now() - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")):
+    stale_before = (datetime.now() - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+    refresh_key = f"minute:{symbol}"
+    needs_refresh = not cached_1m or cached_1m[-1]["datetime"] < stale_before
+    if needs_refresh and not _recently_refreshed(refresh_key):
         # Prefer Fubon 1m; fall back to yfinance (max 7 days for interval="1m").
-        fresh = _fubon_minute(symbol, "1", start_str, end.isoformat())
+        fresh = _fubon_minute(symbol, "1", start_str, end.isoformat(), fail_fast=fail_fast)
+        _mark_refreshed(refresh_key)
         if fresh is None:
-            ticker = yf.Ticker(_twse_symbol(symbol))
+            ticker = yf.Ticker(yf_symbol(symbol))
             period = f"{min(days, 7)}d"
             hist = ticker.history(period=period, interval="1m")
             fresh = []
@@ -398,7 +509,7 @@ def fetch_15m_history(symbol: str, days: int = YF_15M_MAX_DAYS) -> list[dict]:
     end_str = (date.today() + timedelta(days=1)).isoformat()
     yf_records = _fubon_minute(symbol, "15", start_str, end_str)
     if yf_records is None:
-        ticker = yf.Ticker(_yf_symbol(symbol))
+        ticker = yf.Ticker(yf_symbol(symbol))
         hist = ticker.history(start=start_str, end=end_str, interval="15m", auto_adjust=False)
         yf_records = []
         for dt, row in hist.iterrows():

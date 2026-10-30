@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { useStockTabs } from '@/lib/stock-tab-context';
 
 export interface WatchlistPanelProps {
   className?: string;
@@ -24,6 +25,7 @@ export function WatchlistPanel({ className }: WatchlistPanelProps) {
   const [stocks, setStocks] = useState<WatchlistStock[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { openTab } = useStockTabs();
 
   useEffect(() => {
     const fetchWatchlist = async () => {
@@ -134,14 +136,28 @@ export function WatchlistPanel({ className }: WatchlistPanelProps) {
                   return (
                     <TableRow key={stock.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
                       <TableCell>
-                        <Link href={`/stock/${stock.stock_id}`} className="block w-full">
+                        <a
+                          href={`/stock/${stock.stock_id}`}
+                          className="block w-full"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            openTab(stock.stock_id, stock.name);
+                          }}
+                        >
                           {stock.stock_id}
-                        </Link>
+                        </a>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/stock/${stock.stock_id}`} className="block w-full">
+                        <a
+                          href={`/stock/${stock.stock_id}`}
+                          className="block w-full"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            openTab(stock.stock_id, stock.name);
+                          }}
+                        >
                           {stock.name}
-                        </Link>
+                        </a>
                       </TableCell>
                       <TableCell className={cn('text-right font-medium', colorClass)}>
                         {stock.close.toFixed(2)}

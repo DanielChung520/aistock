@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useStockTabs } from '@/lib/stock-tab-context'
 import {
   Dialog,
   DialogContent,
@@ -37,6 +38,7 @@ interface PatternSearchPanelProps {
 
 export function PatternSearchPanel({ initialPatternId }: PatternSearchPanelProps) {
   const { settings: sysSettings } = useSystemSettings()
+  const { openTab } = useStockTabs()
   const [patterns, setPatterns] = useState<SearchPattern[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedKey, setSelectedKey] = useState<string | null>(initialPatternId ?? null)
@@ -548,7 +550,14 @@ export function PatternSearchPanel({ initialPatternId }: PatternSearchPanelProps
                     <tr key={r.stock_id} className="border-b border-border/40 hover:bg-muted/30">
                       <td className="px-2 py-1">
                         <div className="font-mono leading-tight">
-                          <a href={`/stock/${r.stock_id}`} className="text-primary hover:underline">
+                          <a
+                            href={`/stock/${r.stock_id}`}
+                            className="text-primary hover:underline"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              openTab(r.stock_id, r.name ?? '')
+                            }}
+                          >
                             {r.stock_id}
                           </a>
                         </div>

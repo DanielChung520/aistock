@@ -1,3 +1,5 @@
+import os
+
 from arango import ArangoClient
 from arango.database import StandardDatabase
 from arango.exceptions import DatabaseCreateError
@@ -13,7 +15,10 @@ def get_client() -> ArangoClient:
     if _client is None:
         settings = get_settings()
         # request_timeout=300: 大查詢（如敏感度分析載入全特徵）可能超過預設 60s
-        _client = ArangoClient(hosts=settings.ARANGO_URL, request_timeout=300)
+        _client = ArangoClient(
+            hosts=settings.ARANGO_URL,
+            request_timeout=int(os.environ.get("ARANGO_REQUEST_TIMEOUT", "300")),
+        )
     return _client
 
 

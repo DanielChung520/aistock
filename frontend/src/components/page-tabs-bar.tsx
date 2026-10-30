@@ -1,40 +1,13 @@
 'use client'
 
-import { X } from 'lucide-react'
-import { usePathname, useRouter } from 'next/navigation'
+import { X, Home } from 'lucide-react'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { useStockTabs } from '@/lib/stock-tab-context'
-import { usePageTabs } from '@/lib/page-tab-context'
-import { FUNCTION_PAGES, HOME_ROUTE, type FunctionPage } from '@/lib/page-tabs'
 import { cn } from '@/lib/utils'
 import appConfig from '@/config/app.json'
 
 export function PageTabsBar() {
   const { tabs, activeTab, setActiveTab, closeTab } = useStockTabs()
-  const { pinnedRoutes, pinPage, unpinPage } = usePageTabs()
-  const pathname = usePathname()
-  const router = useRouter()
-
-  const visiblePages = FUNCTION_PAGES.filter((p) => pinnedRoutes.includes(p.route))
-
-  const handleFunctionClick = (page: FunctionPage) => {
-    if (page.route === HOME_ROUTE) {
-      if (pathname === HOME_ROUTE) {
-        setActiveTab(null)
-      } else {
-        router.push(HOME_ROUTE)
-      }
-    } else {
-      router.push(page.route)
-    }
-  }
-
-  const handleClosePage = (page: FunctionPage) => {
-    unpinPage(page.route)
-    if (pathname === page.route) {
-      router.push(HOME_ROUTE)
-    }
-  }
 
   return (
     <div className="h-10 border-b border-border bg-card/40 backdrop-blur-sm flex items-center px-2 gap-1 shrink-0">
@@ -51,42 +24,20 @@ export function PageTabsBar() {
 
       <ScrollArea className="flex-1 whitespace-nowrap">
         <div className="flex gap-1">
-          {visiblePages.map((page) => {
-            const isActive =
-              page.route === HOME_ROUTE
-                ? pathname === HOME_ROUTE && activeTab === null
-                : pathname === page.route
-            const canClose = page.route !== HOME_ROUTE
-            const Icon = page.icon
-            return (
-              <div
-                key={page.route}
-                onClick={() => handleFunctionClick(page)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium cursor-pointer select-none transition-colors border',
-                  isActive
-                    ? 'bg-card text-foreground border border-border shadow-sm'
-                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground border-transparent',
-                )}
-                title={page.title}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                <span>{page.title}</span>
-                {canClose && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleClosePage(page)
-                    }}
-                    className="ml-0.5 p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
-                    title={`關閉「${page.title}」`}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-            )
-          })}
+          {/* 首頁 tab — 內容由 sidebar-left 決定，點擊回到首頁 tab 檢視 */}
+          <button
+            onClick={() => setActiveTab(null)}
+            className={cn(
+              'inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium cursor-pointer select-none transition-colors border',
+              activeTab === null
+                ? 'bg-card text-foreground border border-border shadow-sm'
+                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground border-transparent',
+            )}
+            title="首頁"
+          >
+            <Home className="h-3.5 w-3.5" />
+            <span>首頁</span>
+          </button>
 
           {tabs.length > 0 && (
             <>
